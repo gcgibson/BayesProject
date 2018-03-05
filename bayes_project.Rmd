@@ -10,7 +10,7 @@ knitr::opts_chunk$set(echo = TRUE)
 ```
 
 ```{r}
-csv.data <- read.csv("/Users/gcgibson/Downloads/SSS-Mass School Shootings BINARY (2) 12-20-2017.csv")
+csv.data <- read.csv("data.csv")
 print (colnames(csv.data))
 ```
 
