@@ -1,0 +1,25 @@
+---
+title: "Bayes Project"
+author: "Bianca, Heather, Casey"
+date: "3/5/2018"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r}
+csv.data <- read.csv("/Users/gcgibson/Downloads/SSS-Mass School Shootings BINARY (2) 12-20-2017.csv")
+print (colnames(csv.data))
+```
+
+Potential models:
+Let
+$$y_i = \text{ length of sentence of the ith school shooting perpetrator}$$
+$$r_i = \text{ race of the perpetrator  }$$
+$$g_i = \text{ gun used by perpetrator} $$
+
+$$\alpha_j[i] = \text{ random intercept accounting for geographic region}$$
+$$Y_i \sim Pois(\lambda_i)$$
+$$log(\lambda_i) = \alpha_{j[i]} + \beta_1*r_i + \beta_2*g_i +  \beta_3*t_i$$
