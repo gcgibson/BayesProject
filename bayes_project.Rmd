@@ -10,11 +10,17 @@ output:
 ```{r setup, include=FALSE}
 knitr::opts_chunk$set(echo = TRUE)
 ```
+### Intro
 
+School shootings have long been unique in America for their frequency and intensity. We have obtained a dataset on all US school shootings since 1766 through UMass GRID in order to begin research on an issue that has had very little scientific study. By examining this data-set in a statistically rigorous way, we hope to gain a better understanding of a tragic phenomenon that does not seem to be in decline. 
+
+
+### Data
 ```{r}
 csv.data <- read.csv("data.csv")
 head(colnames(csv.data),10)
 ```
+
 
 Potential model:
 Let
