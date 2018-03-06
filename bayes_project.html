@@ -123,7 +123,7 @@ $(document).ready(function () {
 </div>
 
 
-<pre class="r"><code>csv.data &lt;- read.csv(&quot;/Users/gcgibson/Downloads/SSS-Mass School Shootings BINARY (2) 12-20-2017.csv&quot;)
+<pre class="r"><code>csv.data &lt;- read.csv(&quot;data.csv&quot;)
 print (colnames(csv.data))</code></pre>
 <pre><code>##  [1] &quot;Notes.1&quot;                                                                                                                                                                                                                                                                                                                                                                                                                
 ##  [2] &quot;Date&quot;                                                                                                                                                                                                                                                                                                                                                                                                                   
@@ -206,8 +206,13 @@ print (colnames(csv.data))</code></pre>
 ## [79] &quot;Source.18&quot;                                                                                                                                                                                                                                                                                                                                                                                                              
 ## [80] &quot;Source.19&quot;                                                                                                                                                                                                                                                                                                                                                                                                              
 ## [81] &quot;Source.20&quot;</code></pre>
-<p>Potential models: Let <span class="math display">\[y_i = \text{ length of sentence of the ith school shooting perpetrator}\]</span> <span class="math display">\[r_i = \text{ race of the perpetrator  }\]</span> <span class="math display">\[g_i = \text{ gun used by perpetrator} \]</span></p>
-<p><span class="math display">\[\alpha_j[i] = \text{ random intercept accounting for geographic region}\]</span> <span class="math display">\[Y_i \sim Pois(\lamba_i)\]</span> <span class="math display">\[log(\lambda_i) = \alpha_{j[i]} + \beta_1*r_i + \beta_2*g_i +  \beta_3*t_i\]</span></p>
+<p>Potential model: Let <span class="math display">\[y_i = \text{ length of sentence of the ith school shooting perpetrator}\]</span> <span class="math display">\[r_i = \text{ race of the perpetrator  }\]</span> <span class="math display">\[g_i = \text{ gun used by perpetrator} \]</span> <span class="math display">\[s_i = \text{ type of institution} \]</span></p>
+<p><span class="math display">\[\alpha_j[i] = \text{ random intercept accounting for geographic region}\]</span></p>
+<p><span class="math display">\[Y_i \sim Pois(\lambda_i)\]</span> <span class="math display">\[log(\lambda_i) = \alpha_{j[i]} + \beta_1*r_i + \beta_2*g_i +  \beta_3*t_i + \beta_4*s_i\]</span></p>
+<p>We will also look at interactions and possible transformations of covariates as needed.</p>
+<p>Questions:<br />
+- Would a time series component work for this model?<br />
+- Should institution type be a hierarchical structure?</p>
 
 
 
