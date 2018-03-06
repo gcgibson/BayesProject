@@ -14,12 +14,21 @@ csv.data <- read.csv("data.csv")
 print (colnames(csv.data))
 ```
 
-Potential models:
+Potential model:
 Let
 $$y_i = \text{ length of sentence of the ith school shooting perpetrator}$$
 $$r_i = \text{ race of the perpetrator  }$$
 $$g_i = \text{ gun used by perpetrator} $$
+$$s_i = \text{ type of institution} $$
 
 $$\alpha_j[i] = \text{ random intercept accounting for geographic region}$$
+
 $$Y_i \sim Pois(\lambda_i)$$
-$$log(\lambda_i) = \alpha_{j[i]} + \beta_1*r_i + \beta_2*g_i +  \beta_3*t_i$$
+$$log(\lambda_i) = \alpha_{j[i]} + \beta_1*r_i + \beta_2*g_i +  \beta_3*t_i + \beta_4*s_i$$
+
+We will also look at interactions and possible transformations of covariates as needed. 
+
+Questions:  
+ - Would a time series component work for this model?  
+ - Should institution type be a hierarchical structure?  
+ 
