@@ -22,7 +22,6 @@ dates <- c("7/25/1880","3/30/1891","4/9/1891 ","3/26/1893","12/13/1898","1/17/19
 dates_formatted <- c()
 
 for (i in 1:length(dates)){
-  print (as.Date(dates[i],"%m/%d/%Y"))
   dates_formatted <- c(dates_formatted,as.Date(dates[i],"%m/%d/%Y"))
 }
 
@@ -36,7 +35,7 @@ state <- c("LA","MS","NY","LA","WV","HI","KY","MI","CA","TX","TX","AZ","OH","WA"
 
 victims <- c("1","0","0","2","5","1","1","44","5","5","15","5","4","1","1","3","1","7","2","2","2","0","1","0","0","2","1","0","1","1","0","1","2","2","5","4","4","0","2","0","0","1","1","2","0","2","3","3","2","2","3","5","1","2","13","0","0","2","0","3","3","1","7","5","0","32","0","0","2","5","3","1","3","7","26","3","3","1","2","1","4","0","9","1")
 
-r <- c("W","?","W","Ws & As","?","L?","W","W","W","W","W","W","?","W","W","W","W","W","?","W","A","","W","W","","A","W","Two Ws","A","W","W","W","A","W","W","A","W","?","A","A","W?","W","W","W","A","W","W","W","N & W","W","W","Two Ws","W","W","Two Ws","W","N","W","L/ W","A","L","A","N","W","L","A","W","A","W","W","W","W","W","A","W","?","M","L","A","L/ A","N","A","W & A","W")
+r <- c("W","?","W","W","?","L","W","W","W","W","W","W","?","W","W","W","W","W","?","W","A","","W","W","","A","W","W","A","W","W","W","A","W","W","A","W","?","A","A","W?","W","W","W","A","W","W","W","N & W","W","W","W","W","W","W","W","N","W","L","A","L","A","N","W","L","A","W","A","W","W","W","W","W","A","W","?","M","L","A","L","N","A","W","W")
 
 
 gt <- c("HS","S","S","?","?","S","H","D","H","HR","A","H","A","R","H","SR","S","R","H","R","H","S","H","R","H","SR","HR","AB","H","H","HS","H","H","H","HR","H","SR","H","R","H","HR","H","S","R","H","R","HR","H","S","R","H","HR","H","HR","HS","HR","H","H","HS","H","A","H","HS","HS","R","H","H","R","HRS","A","H","?","H","H","HR","H","R","H","H","S","H","H","HR","H")
@@ -75,7 +74,47 @@ $$Y_i \sim Pois(\lambda_i)$$
 $$log(\lambda_i) = \alpha_{j[i]} + \beta_1*r_i + \beta_2*g_i +  \beta_3*t_i + \beta_4*s_i$$
 
 
+```{r}
+library(rjags)
+library(R2jags)
 
+model <- "
+model {
+for( i in 1:n) {	
+log(lambda.i[i]) <- (
+# different notation; using betas for main effects and b's for varying effects
+  b0
+  + b1*r[i] + b2*gt[i]
+  )
+  y.i[i] ~ dpois(lambda.i[i])
+}
+
+b0  ~ dnorm(0.0,1.0E-4)
+b1 ~ dnorm(0.0,1.0E-4)
+b2 ~ dnorm(0.0,1.0E-4)
+
+} # end model
+"
+jags.data <- list(y.i = df_$victims, 
+                   r = as.factor(df_$r), gt =as.factor(df_$gt),  n=length(df_$victims))
+
+parnames <- c( "b1", "b0","b2")
+mod <- jags(data = jags.data, 
+                    parameters.to.save=parnames, 
+                    n.chains = 3, n.burnin = 1500, n.iter =1500 + 1000, n.thin = 10, model.file = textConnection(model))
+# some priors and posteriors to check that priors weren't informative
+mcmc.array <- mod$BUGSoutput$sims.array
+par(lwd = 3, cex.axis = 1.5, cex.lab = 1.5, cex.main = 1.5,mar = c(5,5,1,1), mfrow = c(1,3))
+hist(c(mcmc.array[,,"b0"]), freq = F, main = "", xlab ="Intercept")
+curve(dnorm(x,0,sqrt(1/10^(-4))), add = T, col = 2)
+
+hist(c(mcmc.array[,,"b1"]), freq = F, main = "", xlab ="Race")
+curve(dnorm(x,0,sqrt(1/10^(-4))), add = T, col = 2)
+
+hist(c(mcmc.array[,,"b1"]), freq = F, main = "", xlab ="Gun Type ")
+curve(dnorm(x,0,sqrt(1/10^(-4))), add = T, col = 2)
+
+```
 
 We will also look at interactions and possible transformations of covariates as needed. 
 
