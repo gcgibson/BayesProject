@@ -9,59 +9,45 @@ output:
 
 ```{r setup, include=FALSE}
 knitr::opts_chunk$set(echo = TRUE)
+require(readr)
 ```
+
+
+```{r combining csvs}
+shootingsafter <- read.csv("~/ShootingsAfter1990.csv")
+moreshootings <- read.csv("~/Shootings2016.csv")
+
+write.csv(rbind(shootingsafter,moreshootings), "AllShootings.csv")
+
+allshootings <- read.csv("~/AllShootings.csv")
+```
+
 ### Intro
 
 School shootings have long been unique in America for their frequency and intensity. We have obtained a dataset on all US school shootings since 1766 through UMass GRID in order to begin research on an issue that has had very little scientific study. By examining this data-set in a statistically rigorous way, we hope to gain a better understanding of a tragic phenomenon that does not seem to be in decline. 
 
 
-### Data
-```{r}
-dates <- c("7/25/1880","3/30/1891","4/9/1891 ","3/26/1893","12/13/1898","1/17/1913","12/26/1916","5/18/1927","5/6/1940","9/15/1959","8/1/1966","11/12/1966","5/4/1970","11/11/1971","1/17/1974","12/30/1974","2/19/1976","7/12/1976","4/28/1978 ","1/29/1979","10/5/1979","9/1/1980","3/19/1982","5/16/1983","9/12/1983","2/24/1984","1/21/1985","5/16/1986","8/12/1986","12/4/1986","2/13/1987","5/20/1988","9/22/1988","9/26/1988","1/17/1989","11/1/1991","5/1/1992","9/11/1992","12/14/1992","7/8/1993","9/17/1993","12/17/1993","11/7/1994","1/26/1995","10/30/1995","11/15/1995","2/2/1996","8/15/1996","2/19/1997","10/1/1997","12/1/1997","3/24/1998","4/24/1998","5/21/1998","4/20/1999","5/20/1999","12/6/1999","3/5/2001","3/22/2001","1/16/2002","10/28/2002","5/9/2003","3/21/2005","10/3/2006","4/10/2007","4/16/2007","10/10/2007","10/24/2007","12/9/2007","2/14/2008","2/12/2010","4/6/2011","2/27/2012","4/2/2012","12/14/2012","1/15/2013","6/7/2013","10/21/2013","5/23/2014","6/5/2014","10/24/2014","11/20/2014","10/1/2015","10/9/2015")
+```{r plots, echo=FALSE}
+dates <- allshootings$Date
+dates <- dates[2:length(dates)]
 
-dates_formatted <- c()
+allshootings$year <- format(as.Date(allshootings$Date,format="%m/%d/%Y"),"%Y")
 
-for (i in 1:length(dates)){
-  dates_formatted <- c(dates_formatted,as.Date(dates[i],"%m/%d/%Y"))
-}
+allshootings$victims <- allshootings$Victim.s..Deceased..at.school.+allshootings$Victim.s..Deceased..off.campus.
 
-city <- c("Baton Rouge","Liberty","Newburgh","Plain Dealing","Charlestown","Honolulu","Lincoln ","Bath","South Pasadena","Houston","Austin ","Mesa","Kent","Spokane","Chicago","Olean","Los Angeles","Fullerton","Norridge","San Diego","Columbia","Whittier","Las Vegas","Brentwood","Compton","Los Angeles","Goddard","Cokeville","New York City","Lewistown","Mayer ","Winnetka","Chicago","Greenwood","Stockton","Iowa City","Olivehurst","Amarillo","Great Barrington","Ogden","Sheridan","Chelsea","Wickliffe","Chapel Hill ","Richmond","Lynnville","Moses Lake","San Diego","Bethel ","Pearl","West Paducah","Jonesboro","Edinboro","Springfield","Littleton","Conyers","Fort Gibson","Santee","El Cajon","Grundy","Tucson ","Cleveland","Red Lake","Paradise","Gresham","Blacksburg","Cleveland","Saginaw","Arvada","Dekalb","Huntsville","Opelika","Chardon ","Oakland","Newtown ","Hazard","Santa Monica","Sparks","Isla Vista","Seattle","Marysville","Tallahassee","Roseburg","Flagstaff")
-
-
-county  <- c("East Baton Rouge Parish","Amite","Orange","Bossier Parish","Poca","Honolulu","Casey","Clinton","Los Angeles","Harris","Travis","Maricopa","Portage","Spokane","Cook","Cattaraugus","Los Angeles","Orange","Cook","San Diego","Richland ","?","Clark","Suffolk","Los Angeles","Los Angeles","Sedgwick","Lincoln","Kings","Fergus","Yavapai","Cook","?","Greenwood","San Joaquin","Johnson","Yuba","Potter","Berkshire","Weber","Sheridan","Washtenew","Wake","Orange","Richmond","Giles","Grant","San Diego","Bethel Census Area","Rankin","McCracken","Craighead","Erie","Lane","Arapohoe","Rockdale","Muskogee","San Diego","San Diego","Buchahan","Pima","?","Red Lake","Lancaster","Multnomah","Montgomery","Cuyahoga","Saginaw","Jefferson/ Adams","Dekalb","Madison","Lee","Geauga","Alameda","Fairfield","Perry","Los Angeles","Washoe","Santa Barbara","King","Snohomish","Leon","Douglas","Coconino")
-
-
-state <- c("LA","MS","NY","LA","WV","HI","KY","MI","CA","TX","TX","AZ","OH","WA","IL","NY","CA","CA","IL","CA","SC","CA","NV","NY","CA","CA","KS","WY","NY","MT","AZ","IL","IL","SC","CA","IA","CA","TX","MA","UT","WY","MI","OH","NC","VA","TN","WA","CA","AK","MS","KY","AR","PA","OR","CO","GA","OK","CA","CA","VA","AZ","OH","MN","PA","OR","VA","OH","MI","CO","IL","AL","AL","OH","CA","CT","KY","CA","NV","CA","WA","WA","FL","OR","AZ")
-
-victims <- c("1","0","0","2","5","1","1","44","5","5","15","5","4","1","1","3","1","7","2","2","2","0","1","0","0","2","1","0","1","1","0","1","2","2","5","4","4","0","2","0","0","1","1","2","0","2","3","3","2","2","3","5","1","2","13","0","0","2","0","3","3","1","7","5","0","32","0","0","2","5","3","1","3","7","26","3","3","1","2","1","4","0","9","1")
-
-r <- c("W","?","W","W","?","L","W","W","W","W","W","W","?","W","W","W","W","W","?","W","A","","W","W","","A","W","W","A","W","W","W","A","W","W","A","W","?","A","A","W?","W","W","W","A","W","W","W","N & W","W","W","W","W","W","W","W","N","W","L","A","L","A","N","W","L","A","W","A","W","W","W","W","W","A","W","?","M","L","A","L","N","A","W","W")
-
-
-gt <- c("HS","S","S","?","?","S","H","D","H","HR","A","H","A","R","H","SR","S","R","H","R","H","S","H","R","H","SR","HR","AB","H","H","HS","H","H","H","HR","H","SR","H","R","H","HR","H","S","R","H","R","HR","H","S","R","H","HR","H","HR","HS","HR","H","H","HS","H","A","H","HS","HS","R","H","H","R","HRS","A","H","?","H","H","HR","H","R","H","H","S","H","H","HR","H")
-
-df_ <- data.frame(id = 1:84)
-
-df_$dates <- as.factor(dates)
-df_$dates <- factor(df_$dates , levels = dates)
-
-df_$gt <- as.factor(gt)
-df_$r <- r
-df_$victims <- as.numeric(victims)
-df_$state <- state
-df_$count <- county
-df_$city <- city
 library(ggplot2)
 
+df_ <- data.frame(id = 1:length(allshootings$Victim.s..Deceased..at.school.))
 
-ggplot(df_,aes(x=df_$gt,y = df_$victims)) + geom_point()   + labs(title = "Number of Victims by Gun Type")
+ggplot(df_,aes(x=allshootings$Weapon.s..Categories,y = allshootings$Victim.s..Deceased..at.school.)) + geom_point()   + labs(title = "Number of Victims by Gun Type")
 
-ggplot(df_,aes(x=df_$dates,y = df_$victims)) + geom_point() + labs(title = "Number of Victims over Time")  + theme(axis.text.x = element_text(angle = 90, hjust = 1))
-
+ggplot(df_,aes(x=allshootings$year,y = allshootings$Victim.s..Deceased..at.school.)) + geom_point() + labs(title = "Number of Victims over Time")  + theme(axis.text.x = element_text(angle = 90, hjust = 1))
 ```
 
 
-Potential model:
+
+
+Potential model for number of victims in an incident:
 Let
 $$y_i = \text{ number of victims in incident }$$
 $$r_i = \text{ race of the perpetrator  }$$
@@ -116,9 +102,6 @@ curve(dnorm(x,0,sqrt(1/10^(-4))), add = T, col = 2)
 
 ```
 
-We will also look at interactions and possible transformations of covariates as needed. 
 
-Questions:  
- - Would a time series component work for this model?  
- - Should institution type be a hierarchical structure?  
+
  
