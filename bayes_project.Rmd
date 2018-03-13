@@ -9,12 +9,17 @@ output:
 
 ```{r setup, include=FALSE}
 knitr::opts_chunk$set(echo = TRUE)
-require(readr)
+library(readr)
+library(ggplot2)
+library(googledrive)
+library(rjags)
+library(R2jags)
 ```
 
 
-```{r combining csvs}
-shootingsafter <- read.csv("~/ShootingsAfter1990.csv")
+```{r reading in data combining csvs, warning=FALSE, results='hide'}
+gun_regulations <- read.csv("~/gun_regulation.csv")
+shootingsafter <- read.csv("~/ShootingsAfter1991.csv")
 moreshootings <- read.csv("~/Shootings2016.csv")
 
 write.csv(rbind(shootingsafter,moreshootings), "AllShootings.csv")
@@ -31,19 +36,47 @@ School shootings have long been unique in America for their frequency and intens
 dates <- allshootings$Date
 dates <- dates[2:length(dates)]
 
-allshootings$year <- format(as.Date(allshootings$Date,format="%m/%d/%Y"),"%Y")
+allshootings$Date <- as.Date(allshootings$Date,format="%m/%d/%Y")
+allshootings$year <- format(allshootings$Date,"%Y")
 
-allshootings$victims <- allshootings$Victim.s..Deceased..at.school.+allshootings$Victim.s..Deceased..off.campus.
+number <- rep(NA, length(allshootings$Victim.s..Deceased..at.school.))
 
-library(ggplot2)
+for (i in 1:length(allshootings$Victim.s..Deceased..at.school.)){
+  if (is.na(allshootings$Victim.s..Deceased..at.school.)[i]==TRUE){
+    number[i] <- 0
+  }
+    else{
+      number[i]<- allshootings$Victim.s..Deceased..at.school.[i]
+  }
+}
 
-df_ <- data.frame(id = 1:length(allshootings$Victim.s..Deceased..at.school.))
+#allshootings$victims <- allshootings$Victim.s..Deceased..at.school.+allshootings$Victim.s..Deceased..off.campus.
 
-ggplot(df_,aes(x=allshootings$Weapon.s..Categories,y = allshootings$Victim.s..Deceased..at.school.)) + geom_point()   + labs(title = "Number of Victims by Gun Type")
+ggplot(gun_regulations,aes(x=gun_regulations$state,y = gun_regulations$lawtotal)) + geom_point()   + labs(title = "Total Number of Gun Regulations by State")
 
-ggplot(df_,aes(x=allshootings$year,y = allshootings$Victim.s..Deceased..at.school.)) + geom_point() + labs(title = "Number of Victims over Time")  + theme(axis.text.x = element_text(angle = 90, hjust = 1))
+ggplot(allshootings,aes(x=allshootings$Weapon.s..Categories,y = allshootings$Victim.s..Deceased..at.school.)) + geom_point()   + labs(title = "Number of Victims by Gun Type", y="Number of Victims", x="Type of Gun")
+
+ggplot(allshootings, aes(x=allshootings$year,y = allshootings$Victim.s..Deceased..at.school.)) + geom_point() + labs(title = "Number of Victims over Time", y="Number of Victims", x="Year")  + theme(axis.text.x = element_text(angle = 90, hjust = 1))
 ```
+Potential model for number of shootings:
+Let
+$$y_{j} = \text{ number of shootings in state } j $$
+$$ m_j = \text{ mental health resourses or mental health prevalence in state } j$$
 
+$$g.reg_{j} = \text{ gun regulations} $$
+
+$$\alpha_{k[j]} = \text{ random intercept accounting for geographic region}$$
+
+$$Y_{j} \sim Pois(\lambda_{j})$$
+$$log(\lambda_{j}) = \alpha_{k} + \beta_1*g.reg_{j} + + \beta_2*m_{j} + \beta_3*time  $$
+
+
+Potential model for gun type used: 
+
+$$ \text{ gun type } = G_{i} \sim Multinomial(J, p_1, ..., p_J) $$
+$$log(\frac {P(G_i = j|g.reg_i)}{P(G_i = J|g.reg_i)}) = \alpha_j + \beta_j*g.reg_i  $$
+$$ j = 1, ..., J-1 $$
+$$ J \text{ is the reference gun type} $$
 
 
 
@@ -60,10 +93,7 @@ $$Y_i \sim Pois(\lambda_i)$$
 $$log(\lambda_i) = \alpha_{j[i]} + \beta_1*r_i + \beta_2*g_i +  \beta_3*t_i + \beta_4*s_i$$
 
 
-```{r}
-library(rjags)
-library(R2jags)
-
+```{r, results='hide'}
 model <- "
 model {
 for( i in 1:n) {	
@@ -81,13 +111,16 @@ b2 ~ dnorm(0.0,1.0E-4)
 
 } # end model
 "
-jags.data <- list(y.i = df_$victims, 
-                   r = as.factor(df_$r), gt =as.factor(df_$gt),  n=length(df_$victims))
+jags.data <- list(y.i = allshootings$Victim.s..Deceased..at.school., 
+                   r = allshootings$Shooter.s..or.Attacker.s..Race, gt =allshootings$Weapon.s..Categories,  n=length(allshootings$Victim.s..Deceased..at.school.))
 
 parnames <- c( "b1", "b0","b2")
 mod <- jags(data = jags.data, 
                     parameters.to.save=parnames, 
                     n.chains = 3, n.burnin = 1500, n.iter =1500 + 1000, n.thin = 10, model.file = textConnection(model))
+```
+
+```{r}
 # some priors and posteriors to check that priors weren't informative
 mcmc.array <- mod$BUGSoutput$sims.array
 par(lwd = 3, cex.axis = 1.5, cex.lab = 1.5, cex.main = 1.5,mar = c(5,5,1,1), mfrow = c(1,3))
@@ -99,7 +132,6 @@ curve(dnorm(x,0,sqrt(1/10^(-4))), add = T, col = 2)
 
 hist(c(mcmc.array[,,"b1"]), freq = F, main = "", xlab ="Gun Type ")
 curve(dnorm(x,0,sqrt(1/10^(-4))), add = T, col = 2)
-
 ```
 
 
