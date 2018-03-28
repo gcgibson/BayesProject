@@ -1,0 +1,430 @@
+---
+title: "My Analysis - 730 Project"
+author: "Bianca Doone"
+date: "March 27, 2018"
+output: pdf_document
+---
+My Main Model:
+
+incidents = rho*y.tmin1 + e.t
+
+
+Reading in data, cleaning (1991-2015)
+```{r}
+mydata = read.csv("C:/Users/bdoone/Desktop/Spring 2018/730/project/ShootingsAfter1991.csv", header = T)
+
+mydata$region[mydata$State == "CT" | 
+                mydata$State == "ME"| 
+                mydata$State == "MA"| 
+                mydata$State == "NH"| 
+                mydata$State == "RI"| 
+                mydata$State == "VT"| 
+                mydata$State == "NJ"| 
+                mydata$State == "NY"| 
+                mydata$State == "PA"| 
+                mydata$State == "NY "] <- "Northeast"
+
+mydata$region[mydata$State == "IL" | 
+                mydata$State == "IN"| 
+                mydata$State == "MI"| 
+                mydata$State == "OH"| 
+                mydata$State == "WI"| 
+                mydata$State == "IA"| 
+                mydata$State == "KS"| 
+                mydata$State == "MN"| 
+                mydata$State == "MO"| 
+                mydata$State == "NE"| 
+                mydata$State == "ND"| 
+                mydata$State == "SD"] <- "Midwest"
+
+mydata$region[mydata$State == "DE" | 
+                mydata$State == "FL"| 
+                mydata$State == "GA"| 
+                mydata$State == "MD"| 
+                mydata$State == "NC"| 
+                mydata$State == "SC"| 
+                mydata$State == "VA"| 
+                mydata$State == "Wash D.C"| 
+                mydata$State == "WV"| 
+                mydata$State == "AL"| 
+                mydata$State == "KY"| 
+                mydata$State == "MS"| 
+                mydata$State == "TN"| 
+                mydata$State == "AR"| 
+                mydata$State == "LA"| 
+                mydata$State == "OK"| 
+                mydata$State == "TX"| 
+                mydata$State == "FL "] <- "South"
+
+mydata$region[mydata$State == "AZ" | 
+                mydata$State == "CO"| 
+                mydata$State == "ID"| 
+                mydata$State == "MT"| 
+                mydata$State == "NV"| 
+                mydata$State == "NM"| 
+                mydata$State == "UT"| 
+                mydata$State == "WY"| 
+                mydata$State == "AK"| 
+                mydata$State == "CA"| 
+                mydata$State == "HI"| 
+                mydata$State == "OR"| 
+                mydata$State == "WA"] <- "West"
+table(mydata$region)
+sum(table(mydata$State))
+sum(table(mydata$region))
+
+mydata1 = mydata[,c(1,2,4,56,8,14,21,22)]
+
+colnames(mydata1) = c("Date", "City", "State", "Region", "Type.School", "Season.time","Gender", "Race")
+
+levels(mydata1$Race)
+mydata1$Race2[mydata1$Race == "" |
+                mydata1$Race == "?"|
+                mydata1$Race == "?/?"|
+                mydata1$Race == "Male"] <- "Unknown"
+
+mydata1$Race2[mydata1$Race == "African" |
+                mydata1$Race == "African-Nigeria"|
+                mydata1$Race == "African American"|
+                mydata1$Race == "African American "|
+                mydata1$Race == "African  American"|
+                mydata1$Race == "African American (Officer Perry), ?"|
+                mydata1$Race == "African American, ?"|
+                mydata1$Race == "African American?"|
+                mydata1$Race == "African Americans"|
+                mydata1$Race == "African Americans?"|
+                mydata1$Race == "Six African Americans"|
+                mydata1$Race == "Four African Americans"|
+                mydata1$Race == "Three African Americans"|
+                mydata1$Race == "Two African Americans"|
+                mydata1$Race == "Two African American"] <- "African American"
+
+mydata1$Race2[mydata1$Race == "Asian" |
+                mydata1$Race == "Vietnamese"] <- "Asian"
+
+mydata1$Race2[mydata1$Race == "Cauacasian" |
+                mydata1$Race == "Caucasian"|
+                mydata1$Race == "Caucasian?"|
+                mydata1$Race == "Four Caucasians"|
+                mydata1$Race == "Two caucasians"|
+                mydata1$Race == "Two Caucasians"|
+                mydata1$Race == "Two Armenians"] <- "Caucasian"
+
+mydata1$Race2[mydata1$Race == "Hispanic" |
+                mydata1$Race == "Hispanic?"|
+                mydata1$Race == "Latino"|
+                mydata1$Race == "Latino?"] <- "Latino/Hispanic"
+
+mydata1$Race2[mydata1$Race == "Middle Eastern" |
+                mydata1$Race == "Pakistani"] <- "Middle Eastern"
+
+mydata1$Race2[mydata1$Race == "Native American"] <- "Native American"
+
+mydata1$Race2[mydata1$Race == "Caucasian & African American" |
+                mydata1$Race == "Caucasian (Collar), African American (Austin)"|
+                mydata1$Race == "Four Latinos/African American(Chaparro-Wilson)"|
+                mydata1$Race == "Latino or Caucasian?"|
+                mydata1$Race == "Latino/ Asian"|
+                mydata1$Race == "Latino/ Caucasian"|
+                mydata1$Race == "Native American & Caucasian"] <- "Mixed"
+```
+
+
+Reading in data, cleaning (2016-2017)
+
+```{r}
+mydata16.17 = read.csv("C:/Users/bdoone/Desktop/Spring 2018/730/project/Shootings2016.csv", header = T)
+
+mydata16.17$region[mydata16.17$State == "CT" | 
+                mydata16.17$State == "ME"| 
+                mydata16.17$State == "MA"| 
+                mydata16.17$State == "NH"| 
+                mydata16.17$State == "RI"| 
+                mydata16.17$State == "VT"| 
+                mydata16.17$State == "NJ"| 
+                mydata16.17$State == "NY"| 
+                mydata16.17$State == "PA"| 
+                mydata16.17$State == "NY "] <- "Northeast"
+
+mydata16.17$region[mydata16.17$State == "IL" | 
+                mydata16.17$State == "IN"| 
+                mydata16.17$State == "MI"| 
+                mydata16.17$State == "OH"| 
+                mydata16.17$State == "WI"| 
+                mydata16.17$State == "IA"| 
+                mydata16.17$State == "KS"| 
+                mydata16.17$State == "MN"| 
+                mydata16.17$State == "MO"| 
+                mydata16.17$State == "NE"| 
+                mydata16.17$State == "ND"| 
+                mydata16.17$State == "SD"] <- "Midwest"
+
+mydata16.17$region[mydata16.17$State == "DE" | 
+                mydata16.17$State == "FL"| 
+                mydata16.17$State == "GA"| 
+                mydata16.17$State == "MD"| 
+                mydata16.17$State == "NC"| 
+                mydata16.17$State == "SC"| 
+                mydata16.17$State == "VA"| 
+                mydata16.17$State == "Wash D.C"| 
+                mydata16.17$State == "WV"| 
+                mydata16.17$State == "AL"| 
+                mydata16.17$State == "KY"| 
+                mydata16.17$State == "MS"| 
+                mydata16.17$State == "TN"| 
+                mydata16.17$State == "AR"| 
+                mydata16.17$State == "LA"| 
+                mydata16.17$State == "OK"| 
+                mydata16.17$State == "TX"| 
+                mydata16.17$State == "FL "] <- "South"
+
+mydata16.17$region[mydata16.17$State == "AZ" | 
+                mydata16.17$State == "CO"| 
+                mydata16.17$State == "ID"| 
+                mydata16.17$State == "MT"| 
+                mydata16.17$State == "NV"| 
+                mydata16.17$State == "NM"| 
+                mydata16.17$State == "UT"| 
+                mydata16.17$State == "WY"| 
+                mydata16.17$State == "AK"| 
+                mydata16.17$State == "CA"| 
+                mydata16.17$State == "HI"| 
+                mydata16.17$State == "OR"| 
+                mydata16.17$State == "WA"] <- "West"
+
+table(mydata16.17$region)
+sum(table(mydata16.17$State))
+sum(table(mydata16.17$region))
+
+mydata16.17.1 = mydata16.17[,c(1,2,4,56,8,14,21,22)]
+
+colnames(mydata16.17.1) = c("Date", "City", "State", "Region", "Type.School", "Season.time","Gender", "Race")
+
+levels(mydata16.17.1$Race)
+
+mydata16.17.1$Race2[mydata16.17.1$Race == "" |
+                mydata16.17.1$Race == "?"] <- "Unknown"
+
+mydata16.17.1$Race2[mydata16.17.1$Race == "Caucasian" |
+                mydata16.17.1$Race == "Caucasian?"] <- "Caucasian"
+
+mydata16.17.1$Race2[mydata16.17.1$Race == "African American" |
+                mydata16.17.1$Race == "African American?"|
+                  mydata16.17.1$Race == "Two African Americans"] <- "African American"
+
+mydata16.17.1$Race2[mydata16.17.1$Race == "Hispanic"] <- "Latino/Hispanic"
+
+mydata16.17.1$Race2[mydata16.17.1$Race == "Middle Eastern or Asian"] <- "Mixed"
+
+```
+
+
+Full data set
+```{r}
+ss.data = as.data.frame(rbind(mydata1,mydata16.17.1))
+
+levels(ss.data$Type.School)
+
+ss.data$ST[ss.data$Type.School == "District Offices"|
+             ss.data$Type.School == "Missionary Training School"|
+             ss.data$Type.School == "School Board Meeting"|
+             ss.data$Type.School == "Specialty"|
+             ss.data$Type.School == "Specialty "|
+             ss.data$Type.School == "Specialty?"] <- "Other"
+
+ss.data$ST[ss.data$Type.School == "College"|
+             ss.data$Type.School == "Community    College"|
+             ss.data$Type.School == "Community College"] <- "College"
+
+ss.data$ST[ss.data$Type.School == "High"|
+             ss.data$Type.School == "High "] <- "High"
+
+ss.data$ST[ss.data$Type.School == "Middle"] <- "Middle"
+
+ss.data$ST[ss.data$Type.School == "Elementary"|
+             ss.data$Type.School == "Elementary "] <- "Elementary"
+
+ss.data$ST[ss.data$Type.School == "Preschool"] <- "Preschool"
+
+ss.data$ST[ss.data$Type.School == "K-12"|
+             ss.data$Type.School == "K-8"|
+             ss.data$Type.School == "Middle/High"|
+             ss.data$Type.School == "PK-12"|
+             ss.data$Type.School == "PK-8"|
+             ss.data$Type.School == "Preschool-8th"|
+             ss.data$Type.School == " Preschool-8th"] <- "Mixed"
+
+ss.data$ST[ss.data$Type.School == "?"] <- "Unknown"
+
+sum(table(ss.data$Type.School))
+sum(table(ss.data$ST))
+
+
+levels(ss.data$Season.time)
+levels(ss.data$timeSeas)
+
+ss.data$timeSeas[ss.data$Season.time == "Autumn"] <- "Autumn"
+
+ss.data$timeSeas[ss.data$Season.time == "spring"|
+                 ss.data$Season.time == "Spring"] <- "Spring"
+ss.data$timeSeas[ss.data$Season.time == "winter"|
+                 ss.data$Season.time == "Winter?"|
+                 ss.data$Season.time == "Winter"] <- "Winter"
+
+ss.data$timeSeas[ss.data$Season.time == "Summer"] <- "Summer"
+
+ss.data$timeSeas[ss.data$Season.time == ""|
+               ss.data$Season.time =="?"|
+                 ss.data$Season.time == "S"] <- NA
+
+table(ss.data$timeSeas)
+
+
+levels(ss.data$Gender)
+table(ss.data$Gender)
+
+ss.data$Male[ss.data$Gender == ""|
+               ss.data$Gender == "?"|
+               ss.data$Gender == "Gender neutral"|
+               ss.data$Gender == "Two females, Five males"|
+               ss.data$Gender == "Two males & two females"] <- NA
+
+ss.data$Male[ss.data$Gender == "Female"] <- 0
+
+ss.data$Male[ss.data$Gender == "Five males"|
+               ss.data$Gender == "Four males"|
+               ss.data$Gender == "Male"|
+               ss.data$Gender == "Male "|
+               ss.data$Gender == "Males"|
+               ss.data$Gender == "Six males"|
+               ss.data$Gender == "Three males"|
+               ss.data$Gender == "Three males/Male"|
+               ss.data$Gender == "Two males"|
+               ss.data$Gender == "Two Males"] <- 1
+
+table(ss.data$Male)
+
+
+ss.data$Region <- as.factor(ss.data$Region)
+ss.data$Race2 <- as.factor(ss.data$Race2)
+ss.data$ST <- as.factor(ss.data$ST)
+ss.data$Male <- as.factor(ss.data$Male)
+ss.data$timeSeas <- as.factor(ss.data$timeSeas)
+
+ss.data$Date1 <- as.Date(ss.data$Date, format = "%m/%d/%Y")
+
+shootings = ss.data[,c(13,2,3,4,9,10,11,12)]
+
+shootings2 = subset(shootings, is.na(shootings$Date1) == F)
+
+write.csv(shootings2, file = "C:/Users/bdoone/Desktop/shootingsclean.csv")
+
+```
+
+
+Create Time Variable
+
+```{r}
+head(unclass(shootings2$Date1))
+
+#days starts on first day of 1991
+shootings2$Days = unclass(shootings2$Date1) - 7670
+```
+
+Create indicator for shooting, with full dataset
+
+```{r}
+alldays <- seq(1:10000)
+shoot_ind = rep(0,10000)
+
+full_shoot = data.frame(matrix(nrow = 10000, ncol = 11))
+fs_col = rep(NA,11)
+full_shoot[c(1:10000),] = fs_col
+colnames(full_shoot) = c(colnames(shootings2), "Shooting", "All Days")
+
+for(i in 1:length(alldays)){
+  for(j in 1:length(shootings2$Days)){
+    if(alldays[i] == shootings2$Days[j]){
+      shoot_ind[i] = 1
+      full_shoot[i,c(1:9)] = shootings2[j,]
+    }
+  }
+}
+
+full_shoot[,10] = shoot_ind
+full_shoot[,11] = alldays
+
+full_shoot$Date1 = unclass(full_shoot$Date1) + 17897
+full_shoot$Date1 = full_shoot$Date1 + 7670
+
+full_shoot$Date1 = as.Date(full_shoot$Date1, origin = "1970-01-01")
+
+full_shoot$`All Days` = full_shoot$`All Days` +1
+addrow = data.frame(t(c(NA,NA,NA,NA,NA,NA,NA,NA,NA,0,1)))
+
+colnames(addrow) = colnames(full_shoot)
+
+shootfinal = data.frame(rbind(addrow,full_shoot))
+
+shootfinal$AllDate = as.Date(shootfinal$All.Days + 7669, origin = "1970-01-01")
+
+ss_final = shootfinal[,c(12,11,10,2,3,4,8,5,6,7)]
+
+
+city_levels = levels(shootings2$City)
+state_levels = levels(shootings2$State)
+region_levels = levels(shootings2$Region)
+male_levels = levels(shootings2$Male)
+race_levels = levels(shootings2$Race2)
+st_levels = levels(shootings2$ST)
+season_levels = levels(shootings2$timeSeas)
+
+
+ss_final$City <- factor(ss_final$City, levels = c(1:624), labels = city_levels)
+ss_final$State <- factor(ss_final$State, levels = c(1:length(state_levels)), labels = state_levels)
+ss_final$Region <- factor(ss_final$Region, levels = c(1:length(region_levels)), labels = region_levels)
+ss_final$Male <- factor(ss_final$Male, levels = c(1:length(male_levels)), labels = male_levels)
+ss_final$Race2 <- factor(ss_final$Race2, levels = c(1:length(race_levels)), labels = race_levels)
+ss_final$ST <- factor(ss_final$ST, levels = c(1:length(st_levels)), labels = st_levels)
+ss_final$timeSeas <- factor(ss_final$timeSeas, levels = c(1:length(season_levels)), labels = season_levels)
+
+```
+
+Fill in NA's
+
+```{r}
+season365 = c(rep("Winter", 77), rep("Spring", 92), rep("Summer", 94), rep("Autumn", 89), rep("Winter", 13))
+seasonleap = c(rep("Winter", 78), rep("Spring", 92), rep("Summer", 94), rep("Autumn", 89), rep("Winter", 13))
+
+
+seasonvec = c(season365,seasonleap, season365, season365, season365,seasonleap, season365, season365, season365,seasonleap, season365, season365, season365,seasonleap, season365, season365, season365,seasonleap, season365, season365, season365,seasonleap, season365, season365, season365,seasonleap, season365, season365)
+
+
+ss_final = ss_final[c(1:9940),]
+seasonvec = seasonvec[1:9940]
+seasonvec[9940] = "Winter"
+
+
+ss_final[,11] = seasonvec
+colnames(ss_final)[11] = "Season"
+
+ss_final = ss_final[,c(1:9,11)]
+colnames(ss_final)[2] = "AllDays"
+
+write.csv(ss_final, file = "C:/Users/bdoone/Desktop/ss-full.csv")
+```
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
