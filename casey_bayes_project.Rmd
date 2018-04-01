@@ -17,7 +17,7 @@ library(R2jags)
 
 ## Data
 
-```{r reading in data combining csvs, warning=FALSE, results='hide'}
+```{r reading in data combining csvs,echo=FALSE, warning=FALSE, results='hide'}
 
 #setwd("/Users/gcgibson/BayesProject/")
 
@@ -30,7 +30,8 @@ allshootings <- read.csv("/Users/gcgibson/BayesProject/AllShootings.csv")
 
 ames.data <- allshootings$Victim.s..Deceased..at.school.
 
-number_of_victims <- c()
+number_of_victims <-c()
+s <- c()
 for (i in 1:length(ames.data)){
   if (is.na(ames.data[i])){
     #print ("hello")
@@ -42,7 +43,9 @@ for (i in 1:length(ames.data)){
   }
 }
 
-plot(number_of_victims)
+allshootings$number_of_victims <- number_of_victims
+plot(1:length(number_of_victims),number_of_victims)
+#ggplot(allshootings, aes(x=allshootings$Date,y = allshootings$number_of_victims)) + geom_point() + labs(title = "Number of Victims over Time", y="Number of Victims", x="Year")  + theme(axis.text.x = element_text(angle = 90, hjust = 1))
 
 
 type_of_gun <- matrix(0,nrow=length(number_of_victims),ncol=4)
@@ -59,11 +62,19 @@ for (i in 1:length(tmp)){
     type_of_gun[i,4] =  1
   }
 }
-plot(type_of_gun)
 ```
 
 
 We first attempt a simple poisson regression. 
+$$Y_t = \text{number of victims of the t'th school shooting}$$
+$$ X_{1:4} = \text{ gun type encoded as }$$
+$$\text{ 0 = handgun}$$
+$$\text{ 1 = rifle}$$
+$$\text{ 2 = shotgun}$$
+$$\text{ 3 = unknown/other}$$
+
+$$Y_t \sim Poisson(\lambda)$$
+$$log(\lambda) = \beta_0 + \beta_1x_1 + \beta_2x_2 + \beta3x_3$$
 
 ### Poisson
 
@@ -115,9 +126,10 @@ We see that neither handgun nor rifle has a significant effect on the number of 
 
 What if we control for race and age?
 
+$$log(\lambda) = \beta_0 + \beta_1x_1 + \beta_2x_2 + \beta3x_3 + \beta_5r + \beta_6a$$
 ### Poisson w Covariates
 
-```{r}
+```{r,echo=FALSE}
 race <- allshootings$Shooter.s..or.Attacker.s..Race
 race_clean <- c()
 for (i in 1:length(race)){
@@ -201,6 +213,10 @@ We still don't see any effect of rifle on number of victims, but we see a negati
 
 What happens if we control for the large number of zeros present in the data?
 
+$$Y_t \sim \begin{cases}\pi_t +(1-\pi_t)\cdot e^{\mu_t} & \text{ if } \ y_t=0 \\
+(1-\pi_t)\cdot Poisson(\mu_t)  & \text{ if } \ y_t >0 \end{cases}$$
+$$logit(\pi_t) =\alpha_0 + \alpha_1x_1 + \alpha_2x_2 + \alpha3x_3 + \alpha_5r + \alpha_6a$$ 
+$$log(\lambda_t) =\beta_0 + \beta_1x_1 + \beta_2x_2 + \beta3x_3 + \beta_5r + \beta_6a$$ 
 ### Zero Inflated Poisson w Covariates
 
 ```{r}
@@ -208,7 +224,7 @@ library(rjags)
 library(R2jags)
 model <- "model {
     ## Likelihood
-for(i in 1:N){
+    for(i in 1:N){
       y[i] ~ dpois(lambda.hacked[i])
       lambda.hacked[i] <- lambda[i]*(1-zero[i]) + 1e-10*zero[i]
       lambda[i] <- exp(mu.count[i])
@@ -218,6 +234,17 @@ for(i in 1:N){
       zero[i] ~ dbern(pi[i])
       pi[i] <- ilogit(mu.binary[i])
       mu.binary[i] <- alpha1*x1[i] +alpha2*x2[i] + alpha3*x3[i] + alpha4  + alpha5*race[i] + alpha6*age[i]
+    }  
+    for(i in 1:N){
+      pp[i] ~ dpois(plambda.hacked[i])
+      plambda.hacked[i] <- plambda[i]*(1-zero[i]) + 1e-10*zero[i]
+      plambda[i] <- exp(pmu.count[i])
+      pmu.count[i] <- beta1*x1[i] +beta2*x2[i] + beta3*x3[i] + beta4  + beta5*race[i] + beta6*age[i]
+      
+      ## Zero-Inflation
+      pzero[i] ~ dbern(ppi[i])
+      ppi[i] <- ilogit(pmu.binary[i])
+      pmu.binary[i] <- alpha1*x1[i] +alpha2*x2[i] + alpha3*x3[i] + alpha4  + alpha5*race[i] + alpha6*age[i]
     }  
     ## Priors 
   
@@ -245,12 +272,12 @@ forJags <- list(x1=dat$x.1,
                 x4=dat$x.4,
                 age = age,
                 race = race,# predictors
-                y=dat$y,  # DV
+                y=dat$y, 
                 N=1113,  # sample size
                 mu.beta=0,  # priors centered on 0
                 tau.beta=1)  # diffuse priors
 
-parnames <- c( "beta1","beta2","beta3","beta4","beta5","beta6","alpha1","alpha2","alpha3","alpha4","alpha5","alpha6")
+parnames <- c( "beta1","beta2","beta3","beta4","beta5","beta6","alpha1","alpha2","alpha3","alpha4","alpha5","alpha6","pp")
 mod <- jags(data = forJags, 
                     parameters.to.save=parnames, 
                     n.chains = 3, n.burnin = 1500, n.iter =1500 + 1000, n.thin = 10, model.file = textConnection(model))
@@ -266,11 +293,23 @@ print (quantile(mcmc.array[,,"beta2"],c(.025,.975)))
 ```
 
 
-Ah-ha! if we use the Zero-inflated model we see that rifles do have a positive association with a higher number of victims. 
+Ah-ha! if we use the Zero-inflated model we see that rifles do have a positive association with a higher number of victims. This makes sense because the effect of the weapon only matters if the shooter is able to use it (which we use 0 victims as a proxy).
 
 
 
-Just for fun we throw in an $AR(1)$ error process since our data is time-series data. 
+Because we are handling time-series data, errors may be correlated across time. In order to check this, we examine the residuals of the ZIP model fit.
+
+```{r}
+ppd <- c()
+for (i in 1:length(dat$x.1)){
+    ppd <- c(ppd,mcmc.array[,,paste(paste("pp[",i,sep=""),"]",sep="")][1]) 
+}
+
+plot(ppd-dat$y)
+```
+
+The residuals do look nice and centered around 0, so I'm not sure it is really necessary to to use an AR 
+error? We can fit an AR(1) process to the residuals and see if it gives a reasonable fit.
 
 ### Poisson + Ar with Covariates
 
@@ -328,6 +367,4 @@ print ("Effect of Rifle")
 print (quantile(mcmc.array[,,"beta2"],c(.025,.975)))
 
 ```
-
-
 
