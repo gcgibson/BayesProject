@@ -45,7 +45,7 @@ for (i in 1:length(ames.data)){
 
 allshootings$number_of_victims <- number_of_victims
 plot(1:length(number_of_victims),number_of_victims)
-#ggplot(allshootings, aes(x=allshootings$Date,y = allshootings$number_of_victims)) + geom_point() + labs(title = "Number of Victims over Time", y="Number of Victims", x="Year")  + theme(axis.text.x = element_text(angle = 90, hjust = 1))
+#ggplot(allshootings, aes(x=allshootings$Date,y = allshootings$number_of_victims))  geom_point() + labs(title = "Number of Victims over Time", y="Number of Victims", x="Year")  + theme(axis.text.x = element_text(angle = 90, hjust = 1))
 
 
 type_of_gun <- matrix(0,nrow=length(number_of_victims),ncol=4)
@@ -65,7 +65,7 @@ for (i in 1:length(tmp)){
 ```
 
 
-We first attempt a simple poisson regression. 
+We first attempt a simple Poisson regression. 
 $$Y_t = \text{number of victims of the t'th school shooting}$$
 $$ X_{1:4} = \text{ gun type encoded as }$$
 $$\text{ 0 = handgun}$$
@@ -311,6 +311,8 @@ plot(ppd-dat$y)
 The residuals do look nice and centered around 0, so I'm not sure it is really necessary to to use an AR 
 error? We can fit an AR(1) process to the residuals and see if it gives a reasonable fit.
 
+
+
 ### Poisson + Ar with Covariates
 
 ```{r}
@@ -368,3 +370,154 @@ print (quantile(mcmc.array[,,"beta2"],c(.025,.975)))
 
 ```
 
+
+### Hierarchical Extension
+
+In order to take the hierarchical data structure into account, we can cluster by region
+
+```{r}
+
+allshootings$region[allshootings$State == "CT" | 
+                allshootings$State == "ME"| 
+                allshootings$State == "MA"| 
+                allshootings$State == "NH"| 
+                allshootings$State == "RI"| 
+                allshootings$State == "VT"| 
+                allshootings$State == "NJ"| 
+                allshootings$State == "NY"| 
+                allshootings$State == "PA"| 
+                allshootings$State == "NY "] <- 1
+
+allshootings$region[allshootings$State == "IL" | 
+                allshootings$State == "IN"| 
+                allshootings$State == "MI"| 
+                allshootings$State == "OH"| 
+                allshootings$State == "WI"| 
+                allshootings$State == "IA"| 
+                allshootings$State == "KS"| 
+                allshootings$State == "MN"| 
+                allshootings$State == "MO"| 
+                allshootings$State == "NE"| 
+                allshootings$State == "ND"| 
+                allshootings$State == "SD"] <- 2
+
+allshootings$region[allshootings$State == "DE" | 
+                allshootings$State == "FL"| 
+                allshootings$State == "GA"| 
+                allshootings$State == "MD"| 
+                allshootings$State == "NC"| 
+                allshootings$State == "SC"| 
+                allshootings$State == "VA"| 
+                allshootings$State == "Wash D.C"| 
+                allshootings$State == "WV"| 
+                allshootings$State == "AL"| 
+                allshootings$State == "KY"| 
+                allshootings$State == "MS"| 
+                allshootings$State == "TN"| 
+                allshootings$State == "AR"| 
+                allshootings$State == "LA"| 
+                allshootings$State == "OK"| 
+                allshootings$State == "TX"| 
+                allshootings$State == "FL "] <- 3
+
+allshootings$region[allshootings$State == "AZ" | 
+                allshootings$State == "CO"| 
+                allshootings$State == "ID"| 
+                allshootings$State == "MT"| 
+                allshootings$State == "NV"| 
+                allshootings$State == "NM"| 
+                allshootings$State == "UT"| 
+                allshootings$State == "WY"| 
+                allshootings$State == "AK"| 
+                allshootings$State == "CA"| 
+                allshootings$State == "HI"| 
+                allshootings$State == "OR"| 
+                allshootings$State == "WA"] <- 4
+
+```
+
+We first include a random intercept term.
+
+$$log(\lambda_i) = \alpha_{j[i]} + same above$$
+
+```{r}
+library(rjags)
+library(R2jags)
+model <- "model {
+    ## Likelihood
+    for(i in 1:N){
+      y[i] ~ dpois(lambda.hacked[i])
+      lambda.hacked[i] <- lambda[i]*(1-zero[i]) + 1e-10*zero[i]
+      lambda[i] <- exp(mu.count[i])
+      mu.count[i] <- beta.j[region[i]] + beta1*x1[i] +beta2*x2[i] + beta3*x3[i] + beta5*race[i] + beta6*age[i]
+      
+      ## Zero-Inflation
+      zero[i] ~ dbern(pi[i])
+      pi[i] <- ilogit(mu.binary[i])
+      mu.binary[i] <- alpha.j[region[i]] + alpha1*x1[i] +alpha2*x2[i] + alpha3*x3[i] +  alpha5*race[i] + alpha6*age[i]
+    }  
+    for(i in 1:N){
+      pp[i] ~ dpois(plambda.hacked[i])
+      plambda.hacked[i] <- plambda[i]*(1-zero[i]) + 1e-10*zero[i]
+      plambda[i] <- exp(pmu.count[i])
+      pmu.count[i] <-    beta1*x1[i] +beta2*x2[i] + beta3*x3[i]  + beta5*race[i] + beta6*age[i]
+      
+      ## Zero-Inflation
+      pzero[i] ~ dbern(ppi[i])
+      ppi[i] <- ilogit(pmu.binary[i])
+      pmu.binary[i] <-  alpha1*x1[i] +alpha2*x2[i] + alpha3*x3[i]   + alpha5*race[i] + alpha6*age[i]
+    }  
+
+    for (j in 1:J){
+     alpha.j[j] ~ dnorm(mu.beta, tau.beta)
+    }
+  
+    for (j in 1:J){
+     beta.j[j] ~ dnorm(mu.beta, tau.beta)
+    }
+    ## Priors 
+  
+    beta1 ~ dnorm(mu.beta,tau.beta) 
+    beta2 ~ dnorm(mu.beta,tau.beta) 
+    beta3 ~ dnorm(mu.beta,tau.beta) 
+    beta5 ~ dnorm(mu.beta,tau.beta) 
+    beta6 ~ dnorm(mu.beta,tau.beta) 
+
+    alpha1 ~ dnorm(mu.beta,tau.beta) 
+    alpha2 ~ dnorm(mu.beta,tau.beta) 
+    alpha3 ~ dnorm(mu.beta,tau.beta) 
+    alpha5 ~ dnorm(mu.beta,tau.beta) 
+    alpha6 ~ dnorm(mu.beta,tau.beta) 
+
+}"
+
+dat <- data.frame(x=type_of_gun,y=number_of_victims,region = allshootings$region)
+
+forJags <- list(x1=dat$x.1,
+                x2=dat$x.2,
+                x3=dat$x.3,
+                x4=dat$x.4,
+                age = age,
+                race = race,# predictors
+                region = dat$region,
+                y=dat$y, 
+                J = 4,
+                N=1113,  # sample size
+                mu.beta=0,  # priors centered on 0
+                tau.beta=1)  # diffuse priors
+
+parnames <- c( "beta1","beta2","beta3","beta4","beta5","beta6","alpha1","alpha2","alpha3","alpha4","alpha5","alpha6","alpha.j","beta.j")
+mod <- jags(data = forJags, 
+                    parameters.to.save=parnames, 
+                    n.chains = 3, n.burnin = 1500, n.iter =1500 + 1000, n.thin = 10, model.file = textConnection(model))
+
+mcmc.array <- mod$BUGSoutput$sims.array
+#hist(c(mcmc.array[,,"beta[1]"]), freq = F, main = "", xlab ="Intercept")
+#hist(c(mcmc.array[,,"beta[2]"]), freq = F, main = "", xlab ="Slope")
+print ("Effect of Handgun")
+print (quantile(mcmc.array[,,"beta1"],c(.025,.975)))
+print ("Effect of Rifle")
+print (quantile(mcmc.array[,,"beta2"],c(.025,.975)))
+```
+
+When we cluster by region, we maintain the relationship of rifle to number of victims, which is good because it means the observed relationship is not an artifact of the aggregated data.
