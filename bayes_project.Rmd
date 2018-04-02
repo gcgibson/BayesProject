@@ -1,5 +1,5 @@
 ---
-title: "Bayes Project (Casey's Part)"
+title: "Bayes Project"
 author: "Bianca, Heather, Casey"
 date: "3/5/2018"
 output:
@@ -16,320 +16,124 @@ library(rjags)
 library(R2jags)
 ```
 
-## Data
 
 ```{r reading in data combining csvs, warning=FALSE, results='hide'}
-
-#setwd("/Users/gcgibson/BayesProject/")
-
-gun_regulations <- read.csv("/Users/gcgibson/BayesProject/gun_regulation.csv")
-shootingsafter <- read.csv("/Users/gcgibson/BayesProject/ShootingsAfter1991.csv")
-moreshootings <- read.csv("/Users/gcgibson/BayesProject/Shootings2016.csv")
+gun_regulations <- read.csv("~/gun_regulation.csv")
+shootingsafter <- read.csv("~/ShootingsAfter1991.csv")
+moreshootings <- read.csv("~/Shootings2016.csv")
 
 write.csv(rbind(shootingsafter,moreshootings), "AllShootings.csv")
 
-allshootings <- read.csv("/Users/gcgibson/BayesProject/AllShootings.csv")
-
-ames.data <- allshootings$Victim.s..Deceased..at.school.
-
-number_of_victims <- c()
-for (i in 1:length(ames.data)){
-  if (is.na(ames.data[i])){
-    #print ("hello")
-    number_of_victims <- c(number_of_victims,0)
-  } else if (ames.data[i] == "None"){
-    number_of_victims <- c(number_of_victims,0)
-  } else{
-    number_of_victims <- c(number_of_victims,ames.data[i])
-  }
-}
-
-plot(number_of_victims)
-
-
-type_of_gun <- matrix(0,nrow=length(number_of_victims),ncol=4)
-tmp <- allshootings$Weapon.s..Categories
-
-for (i in 1:length(tmp)){
-  if (tmp[i] == "Handgun"){
-    type_of_gun[i,1] =  1
-  } else if (tmp[i] == "Rifle"){
-    type_of_gun[i,2] =  1
-  }  else if (tmp[i] == "Shotgun"){
-    type_of_gun[i,3] =  1
-  }  else {
-    type_of_gun[i,4] =  1
-  }
-}
-plot(type_of_gun)
+allshootings <- read.csv("~/AllShootings.csv")
 ```
 
+### Intro
 
-We first attempt a simple poisson regression. 
-
-### Poisson
+School shootings have long been unique in America for their frequency and intensity. We have obtained a dataset on all US school shootings since 1766 through UMass GRID in order to begin research on an issue that has had very little scientific study. By examining this data-set in a statistically rigorous way, we hope to gain a better understanding of a tragic phenomenon that does not seem to be in decline. 
 
 
-```{r}
-library(rjags)
-library(R2jags)
-model <- "model {
-    ## Likelihood
-for(i in 1:N){
-      y[i] ~ dpois(lambda[i])
-      log(lambda[i]) <- mu[i]
-      mu[i] <- beta4 + beta1*x1[i] +beta2*x2[i] + beta3*x3[i]    
-      }     
-    ## Priors 
-  
-    beta1 ~ dnorm(mu.beta,tau.beta) 
-    beta2 ~ dnorm(mu.beta,tau.beta) 
-    beta3 ~ dnorm(mu.beta,tau.beta) 
-    beta4 ~ dnorm(mu.beta,tau.beta) 
-}"
+```{r plots, echo=FALSE}
+dates <- allshootings$Date
+dates <- dates[2:length(dates)]
 
-dat <- data.frame(x=type_of_gun,y=number_of_victims)
+allshootings$Date <- as.Date(allshootings$Date,format="%m/%d/%Y")
+allshootings$year <- format(allshootings$Date,"%Y")
 
-forJags <- list(x1=dat$x.1,
-                x2=dat$x.2,
-                x3=dat$x.3,# predictors
-                y=dat$y,  # DV
-                N=1113,  # sample size
-                mu.beta=0,  # priors centered on 0
-                tau.beta=1)  # diffuse priors
+number <- rep(NA, length(allshootings$Victim.s..Deceased..at.school.))
 
-parnames <- c( "beta1","beta2","beta3","beta4")
-mod <- jags(data = forJags, 
+for (i in 1:length(allshootings$Victim.s..Deceased..at.school.)){
+  if (is.na(allshootings$Victim.s..Deceased..at.school.)[i]==TRUE){
+    number[i] <- 0
+  }
+    else{
+      number[i]<- allshootings$Victim.s..Deceased..at.school.[i]
+  }
+}
+
+#allshootings$victims <- allshootings$Victim.s..Deceased..at.school.+allshootings$Victim.s..Deceased..off.campus.
+
+ggplot(gun_regulations,aes(x=gun_regulations$state,y = gun_regulations$lawtotal)) + geom_point()   + labs(title = "Total Number of Gun Regulations by State")
+
+ggplot(allshootings,aes(x=allshootings$Weapon.s..Categories,y = allshootings$Victim.s..Deceased..at.school.)) + geom_point()   + labs(title = "Number of Victims by Gun Type", y="Number of Victims", x="Type of Gun")
+
+ggplot(allshootings, aes(x=allshootings$year,y = allshootings$Victim.s..Deceased..at.school.)) + geom_point() + labs(title = "Number of Victims over Time", y="Number of Victims", x="Year")  + theme(axis.text.x = element_text(angle = 90, hjust = 1))
+```
+Potential model for number of shootings:
+Let
+$$y_{j} = \text{ number of shootings in state } j $$
+$$ m_j = \text{ mental health resourses or mental health prevalence in state } j$$
+
+$$g.reg_{j} = \text{ gun regulations} $$
+
+$$\alpha_{k[j]} = \text{ random intercept accounting for geographic region}$$
+
+$$Y_{j} \sim Pois(\lambda_{j})$$
+$$log(\lambda_{j}) = \alpha_{k} + \beta_1*g.reg_{j} + + \beta_2*m_{j} + \beta_3*time  $$
+
+
+Potential model for gun type used: 
+
+$$ \text{ gun type } = G_{i} \sim Multinomial(J, p_1, ..., p_J) $$
+$$log(\frac {P(G_i = j|g.reg_i)}{P(G_i = J|g.reg_i)}) = \alpha_j + \beta_j*g.reg_i  $$
+$$ j = 1, ..., J-1 $$
+$$ J \text{ is the reference gun type} $$
+
+
+
+Potential model for number of victims in an incident:
+Let
+$$y_i = \text{ number of victims in incident }$$
+$$r_i = \text{ race of the perpetrator  }$$
+$$g_i = \text{ gun used by perpetrator} $$
+$$s_i = \text{ type of institution} $$
+
+$$\alpha_j[i] = \text{ random intercept accounting for geographic region}$$
+
+$$Y_i \sim Pois(\lambda_i)$$
+$$log(\lambda_i) = \alpha_{j[i]} + \beta_1*r_i + \beta_2*g_i +  \beta_3*t_i + \beta_4*s_i$$
+
+
+```{r, results='hide'}
+model <- "
+model {
+for( i in 1:n) {	
+log(lambda.i[i]) <- (
+# different notation; using betas for main effects and b's for varying effects
+  b0
+  + b1*r[i] + b2*gt[i]
+  )
+  y.i[i] ~ dpois(lambda.i[i])
+}
+
+b0  ~ dnorm(0.0,1.0E-4)
+b1 ~ dnorm(0.0,1.0E-4)
+b2 ~ dnorm(0.0,1.0E-4)
+
+} # end model
+"
+jags.data <- list(y.i = allshootings$Victim.s..Deceased..at.school., 
+                   r = allshootings$Shooter.s..or.Attacker.s..Race, gt =allshootings$Weapon.s..Categories,  n=length(allshootings$Victim.s..Deceased..at.school.))
+
+parnames <- c( "b1", "b0","b2")
+mod <- jags(data = jags.data, 
                     parameters.to.save=parnames, 
                     n.chains = 3, n.burnin = 1500, n.iter =1500 + 1000, n.thin = 10, model.file = textConnection(model))
+```
 
+```{r}
+# some priors and posteriors to check that priors weren't informative
 mcmc.array <- mod$BUGSoutput$sims.array
-#hist(c(mcmc.array[,,"beta[1]"]), freq = F, main = "", xlab ="Intercept")
-#hist(c(mcmc.array[,,"beta[2]"]), freq = F, main = "", xlab ="Slope")
-print ("Effect of Handgun")
-print (quantile(mcmc.array[,,"beta1"],c(.025,.975)))
-print ("Effect of Rifle")
-print (quantile(mcmc.array[,,"beta2"],c(.025,.975)))
+par(lwd = 3, cex.axis = 1.5, cex.lab = 1.5, cex.main = 1.5,mar = c(5,5,1,1), mfrow = c(1,3))
+hist(c(mcmc.array[,,"b0"]), freq = F, main = "", xlab ="Intercept")
+curve(dnorm(x,0,sqrt(1/10^(-4))), add = T, col = 2)
 
-```
+hist(c(mcmc.array[,,"b1"]), freq = F, main = "", xlab ="Race")
+curve(dnorm(x,0,sqrt(1/10^(-4))), add = T, col = 2)
 
-We see that neither handgun nor rifle has a significant effect on the number of victims. 
-
-What if we control for race and age?
-
-### Poisson w Covariates
-
-```{r}
-race <- allshootings$Shooter.s..or.Attacker.s..Race
-race_clean <- c()
-for (i in 1:length(race)){
-  if (race[i] == "African American"){
-    race_clean <- c(race_clean,0)
-  } else if (race[i] == "Caucasian"){
-    race_clean <- c(race_clean,1)
-  }  else if (race[i] == "Hispanic"){
-    race_clean <- c(race_clean,2)
-  }   else{
-    race_clean <- c(race_clean,4)
-  }
-}
-age <- allshootings$Shooter.s..or.Attacker.s..Age
-age_clean <- c()
-for (i in 1:length(age)){
-  if ( 0 < as.numeric(age[i]) & as.numeric(age[i]) <10 ){
-    age_clean <- c(age_clean,0)
-  } else if (10 < as.numeric(age[i]) & as.numeric(age[i]) < 20){
-    age_clean <- c(age_clean,1)
-  }   else{
-    age_clean <- c(age_clean,2)
-  }
-}
+hist(c(mcmc.array[,,"b1"]), freq = F, main = "", xlab ="Gun Type ")
+curve(dnorm(x,0,sqrt(1/10^(-4))), add = T, col = 2)
 ```
 
 
-
-
-```{r}
-library(rjags)
-library(R2jags)
-model <- "model {
-    ## Likelihood
-for(i in 1:N){
-      y[i] ~ dpois(lambda[i])
-      log(lambda[i]) <- mu[i]
-      mu[i] <- beta1*x1[i] +beta2*x2[i] + beta3*x3[i] + beta4  + beta5*race[i] + beta6*age[i]
-      }     
-    ## Priors 
-  
-    beta1 ~ dnorm(mu.beta,tau.beta) 
-    beta2 ~ dnorm(mu.beta,tau.beta) 
-    beta3 ~ dnorm(mu.beta,tau.beta) 
-    beta4 ~ dnorm(mu.beta,tau.beta) 
-    beta5 ~ dnorm(mu.beta,tau.beta) 
-    beta6 ~ dnorm(mu.beta,tau.beta) 
-}"
-
-dat <- data.frame(x=type_of_gun,y=number_of_victims)
-
-forJags <- list(x1=dat$x.1,
-                x2=dat$x.2,
-                x3=dat$x.3,
-                x4=dat$x.4,
-                age = age,
-                race = race,# predictors
-                y=dat$y,  # DV
-                N=1113,  # sample size
-                mu.beta=0,  # priors centered on 0
-                tau.beta=1)  # diffuse priors
-
-parnames <- c( "beta1","beta2","beta3","beta4","beta5","beta6")
-mod <- jags(data = forJags, 
-                    parameters.to.save=parnames, 
-                    n.chains = 3, n.burnin = 1500, n.iter =1500 + 1000, n.thin = 10, model.file = textConnection(model))
-
-mcmc.array <- mod$BUGSoutput$sims.array
-#hist(c(mcmc.array[,,"beta[1]"]), freq = F, main = "", xlab ="Intercept")
-#hist(c(mcmc.array[,,"beta[2]"]), freq = F, main = "", xlab ="Slope")
-print ("Effect of Handgun")
-print (quantile(mcmc.array[,,"beta1"],c(.025,.975)))
-print ("Effect of Rifle")
-print (quantile(mcmc.array[,,"beta2"],c(.025,.975)))
-
-```
-
-
-We still don't see any effect of rifle on number of victims, but we see a negative effect of a handgun. That is, we can't say that rifles kill more people than other weapons categories (what I hoped we would find), but we can say that handguns kill fewer people than other weapons. From a policy perspective it makes sense to limit weapons to handguns. 
-
-
-What happens if we control for the large number of zeros present in the data?
-
-### Zero Inflated Poisson w Covariates
-
-```{r}
-library(rjags)
-library(R2jags)
-model <- "model {
-    ## Likelihood
-for(i in 1:N){
-      y[i] ~ dpois(lambda.hacked[i])
-      lambda.hacked[i] <- lambda[i]*(1-zero[i]) + 1e-10*zero[i]
-      lambda[i] <- exp(mu.count[i])
-      mu.count[i] <- beta1*x1[i] +beta2*x2[i] + beta3*x3[i] + beta4  + beta5*race[i] + beta6*age[i]
-      
-      ## Zero-Inflation
-      zero[i] ~ dbern(pi[i])
-      pi[i] <- ilogit(mu.binary[i])
-      mu.binary[i] <- alpha1*x1[i] +alpha2*x2[i] + alpha3*x3[i] + alpha4  + alpha5*race[i] + alpha6*age[i]
-    }  
-    ## Priors 
-  
-    beta1 ~ dnorm(mu.beta,tau.beta) 
-    beta2 ~ dnorm(mu.beta,tau.beta) 
-    beta3 ~ dnorm(mu.beta,tau.beta) 
-    beta4 ~ dnorm(mu.beta,tau.beta) 
-    beta5 ~ dnorm(mu.beta,tau.beta) 
-    beta6 ~ dnorm(mu.beta,tau.beta) 
-
-    alpha1 ~ dnorm(mu.beta,tau.beta) 
-    alpha2 ~ dnorm(mu.beta,tau.beta) 
-    alpha3 ~ dnorm(mu.beta,tau.beta) 
-    alpha4 ~ dnorm(mu.beta,tau.beta) 
-    alpha5 ~ dnorm(mu.beta,tau.beta) 
-    alpha6 ~ dnorm(mu.beta,tau.beta) 
-
-}"
-
-dat <- data.frame(x=type_of_gun,y=number_of_victims)
-
-forJags <- list(x1=dat$x.1,
-                x2=dat$x.2,
-                x3=dat$x.3,
-                x4=dat$x.4,
-                age = age,
-                race = race,# predictors
-                y=dat$y,  # DV
-                N=1113,  # sample size
-                mu.beta=0,  # priors centered on 0
-                tau.beta=1)  # diffuse priors
-
-parnames <- c( "beta1","beta2","beta3","beta4","beta5","beta6","alpha1","alpha2","alpha3","alpha4","alpha5","alpha6")
-mod <- jags(data = forJags, 
-                    parameters.to.save=parnames, 
-                    n.chains = 3, n.burnin = 1500, n.iter =1500 + 1000, n.thin = 10, model.file = textConnection(model))
-
-mcmc.array <- mod$BUGSoutput$sims.array
-#hist(c(mcmc.array[,,"beta[1]"]), freq = F, main = "", xlab ="Intercept")
-#hist(c(mcmc.array[,,"beta[2]"]), freq = F, main = "", xlab ="Slope")
-print ("Effect of Handgun")
-print (quantile(mcmc.array[,,"beta1"],c(.025,.975)))
-print ("Effect of Rifle")
-print (quantile(mcmc.array[,,"beta2"],c(.025,.975)))
-
-```
-
-
-Ah-ha! if we use the Zero-inflated model we see that rifles do have a positive association with a higher number of victims. 
-
-
-
-Just for fun we throw in an $AR(1)$ error process since our data is time-series data. 
-
-### Poisson + Ar with Covariates
-
-```{r}
-library(rjags)
-library(R2jags)
-model <- "model {
-    ## Likelihood
-mu.count[1] <-  beta1*x1[1] +beta2*x2[1] + beta3*x3[1] + beta4  + beta5*race[1] + beta6*age[1]
-for(i in 2:N){
-      y[i] ~ dpois(lambda[i])
-      lambda[i] <- exp(mu[i])
-      mu[i] <- mu.count[i] + ar1 * ( y[i-1] - mu.count[i-1] )
-      mu.count[i] <- beta1*x1[i] +beta2*x2[i] + beta3*x3[i] + beta4  + beta5*race[i] + beta6*age[i]
-      
-      
-    }  
-    ## Priors 
-    ar1 ~ dunif(-1.1,1.1) 
-    beta1 ~ dnorm(mu.beta,tau.beta) 
-    beta2 ~ dnorm(mu.beta,tau.beta) 
-    beta3 ~ dnorm(mu.beta,tau.beta) 
-    beta4 ~ dnorm(mu.beta,tau.beta) 
-    beta5 ~ dnorm(mu.beta,tau.beta) 
-    beta6 ~ dnorm(mu.beta,tau.beta) 
 
  
-
-}"
-
-dat <- data.frame(x=type_of_gun,y=number_of_victims)
-
-forJags <- list(x1=dat$x.1,
-                x2=dat$x.2,
-                x3=dat$x.3,
-                x4=dat$x.4,
-                age = age,
-                race = race,# predictors
-                y=dat$y,  # DV
-                N=1113,  # sample size
-                mu.beta=0,  # priors centered on 0
-                tau.beta=1)  # diffuse priors
-
-parnames <- c( "beta1","beta2","beta3","beta4","beta5","beta6","alpha1","alpha2","alpha3","alpha4","alpha5","alpha6")
-mod <- jags(data = forJags, 
-                    parameters.to.save=parnames, 
-                    n.chains = 3, n.burnin = 1500, n.iter =1500 + 1000, n.thin = 10, model.file = textConnection(model))
-
-mcmc.array <- mod$BUGSoutput$sims.array
-#hist(c(mcmc.array[,,"beta[1]"]), freq = F, main = "", xlab ="Intercept")
-#hist(c(mcmc.array[,,"beta[2]"]), freq = F, main = "", xlab ="Slope")
-print ("Effect of Handgun")
-print (quantile(mcmc.array[,,"beta1"],c(.025,.975)))
-print ("Effect of Rifle")
-print (quantile(mcmc.array[,,"beta2"],c(.025,.975)))
-
-```
-
-
-
