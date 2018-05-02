@@ -1,0 +1,555 @@
+---
+title: "Final Report"
+author: "Heather Weaver, Bianca Doone, Casey Gibson"
+date: "4/21/2018"
+output:
+  pdf_document: default
+  html_document: default
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+### 1)
+$$Pr(y_i = j ) = \begin{cases}
+\pi_i  + (1-\pi_i)g(y_i = 0) & j=0 \\
+(1-\pi_i)g(y_i ) & j >0 
+\end{cases}$$
+
+
+$$g \sim Poisson(\lambda_i)$$
+
+where 
+$$logit(\pi_{i}) = \alpha_{0j[i]} + \alpha_{1j[i]}x_{1} +\alpha_{2j[i]}x_{2} + \alpha_{3j[i]}x_{3} + \alpha_{4}(race_i-\bar{race}) + \alpha_5(age_i - \bar{age})$$
+$$log(\lambda_{i}) = \beta_{0j[i]} + \beta_{1j[i]}x_{1} +\beta_{2j[i]}x_{2} + \beta_{3j[i]}x_{3} + \beta_{4}(race_i-\bar{race}) + \beta_5(age_i - \bar{age})$$
+
+
+
+$$\begin{pmatrix}
+\beta_{0j[i]} \\
+\beta_{1j[i]} \\
+\beta_{2j[i]} \\ 
+\beta_{4j[i]}
+\end{pmatrix} \sim N\begin{bmatrix} \begin{pmatrix}
+\mu_{\beta} \\
+\mu_{\beta} \\
+\mu_{\beta}  \\
+\mu_{\beta} 
+\end{pmatrix} ,\Sigma
+\end{bmatrix}
+$$
+
+$$\begin{pmatrix}
+\alpha_{0j[i]} \\
+\alpha_{1j[i]} \\
+\alpha_{2j[i]} \\ 
+\alpha_{4j[i]}
+\end{pmatrix} \sim N\begin{bmatrix} \begin{pmatrix}
+\mu_{\alpha} \\
+\mu_{\alpha} \\
+\mu_{\alpha}  \\
+\mu_{\alpha} 
+\end{pmatrix} ,\Gamma
+\end{bmatrix}
+$$
+
+$$\sigma \sim InvWeishart()$$
+$$\Gamma \sim InvWeishart()$$
+
+
+
+
+### 2)
+
+```{r}
+library(readr)
+library(ggplot2)
+library(rjags)
+library(R2jags)
+
+
+#setwd("/Users/gcgibson/BayesProject/")
+
+shootingsafter <- read.csv("/Users/gcgibson/BayesProject/ShootingsAfter1991.csv")
+moreshootings <- read.csv("/Users/gcgibson/BayesProject/Shootings2016.csv")
+
+
+allshootings <- read.csv("/Users/gcgibson/BayesProject/AllShootings_clean_final.csv")
+
+#gunRegulations <- read.csv("/Users/gcgibson/BayesProject/Gu")
+
+ames.data <- allshootings$Victim.s..Injured..at.school.
+
+number_of_victims <-c()
+s <- c()
+for (i in 1:length(ames.data)){
+  if (is.na(ames.data[i])){
+    #print ("hello")
+    number_of_victims <- c(number_of_victims,0)
+  } else if (ames.data[i] == "None"){
+    number_of_victims <- c(number_of_victims,0)
+  } else{
+    number_of_victims <- c(number_of_victims,ames.data[i])
+  }
+}
+
+allshootings$number_of_victims <- number_of_victims
+
+#plot(1:length(number_of_victims),number_of_victims,ylab="Number #of Victims",xlab="Shooting ID ordered by time")
+p <- ggplot(allshootings, aes(x=seq(1,1113),y = allshootings$number_of_victims)) +  geom_point() + labs(title = "Number of Victims in each shooting incident from 1990-2016", y="Number of Victims", x="1990-2016")   + scale_x_discrete(breaks = c(1,500,1100), labels=c("1990","2002","2016")) +theme(axis.text.x = element_text(angle = 90, hjust = 1))
+print(p)
+
+type_of_gun <- matrix(0,nrow=length(number_of_victims),ncol=4)
+tmp <- allshootings$Weapon.s..Categories
+
+for (i in 1:length(tmp)){
+  if (tmp[i] == "Handgun"){
+    type_of_gun[i,1] =  1
+  } else if (tmp[i] == "Rifle"){
+    type_of_gun[i,2] =  1
+  }  else if (tmp[i] == "Shotgun"){
+    type_of_gun[i,3] =  1
+  }  else {
+    type_of_gun[i,4] =  1
+  }
+}
+
+race <- allshootings$Shooter.s..or.Attacker.s..Race
+race_clean <- c()
+for (i in 1:length(race)){
+  if (race[i] == "African American"){
+    race_clean <- c(race_clean,0)
+  } else if (race[i] == "Caucasian"){
+    race_clean <- c(race_clean,1)
+  }  else if (race[i] == "Hispanic"){
+    race_clean <- c(race_clean,2)
+  }   else{
+    race_clean <- c(race_clean,4)
+  }
+}
+age <- allshootings$Shooter.s..or.Attacker.s..Age
+age_clean <- c()
+for (i in 1:length(age)){
+  if ( 0 < as.numeric(age[i]) & as.numeric(age[i]) <10 ){
+    age_clean <- c(age_clean,0)
+  } else if (10 < as.numeric(age[i]) & as.numeric(age[i]) < 20){
+    age_clean <- c(age_clean,1)
+  }   else{
+    age_clean <- c(age_clean,2)
+  }
+}
+
+dat <- data.frame(x=type_of_gun,y=number_of_victims,race=race_clean -mean(race_clean),age=age_clean-mean(age_clean))
+
+ones_ <- c()
+for (y in dat$y){
+  if (y == 0){
+    ones_ <- c(ones_,0)
+  }
+  else{
+    ones_<-c(ones_,1)
+  }
+}
+
+y_fact <- c()
+for (y in dat$y){
+  
+    y_fact <- c(y_fact,factorial(y))
+ 
+}
+
+
+
+allshootings$region[  allshootings$State == "ME"| 
+                allshootings$State == "MA"| 
+                allshootings$State == "NH"| 
+                allshootings$State == "RI"| 
+                allshootings$State == "VT" ] <- 5
+
+allshootings$region[allshootings$State == "CT" | 
+                allshootings$State == "NJ"| 
+                allshootings$State == "NY"| 
+                allshootings$State == "PA"|
+                  allshootings$State == "WV"] <- 1
+
+allshootings$region[allshootings$State == "IL" | 
+                allshootings$State == "IN"| 
+                allshootings$State == "MI"| 
+                allshootings$State == "OH"| 
+                allshootings$State == "WI"] <-6 
+                  
+allshootings$region[allshootings$State == "MN"| 
+                allshootings$State == "MO"| 
+                allshootings$State == "NE"| 
+                allshootings$State == "ND"| 
+                allshootings$State == "SD"|
+                 allshootings$State == "KS"|
+                  allshootings$State == "IA"] <- 2
+
+allshootings$region[allshootings$State == "DE" | 
+                allshootings$State == "GA"| 
+                allshootings$State == "MD"| 
+                allshootings$State == "NC"| 
+                allshootings$State == "SC"| 
+                allshootings$State == "VA"| 
+                allshootings$State == "FL"| 
+                allshootings$State == "Wash D.C" ] <- 7
+
+allshootings$region[allshootings$State == "AL"| 
+                allshootings$State == "KY"| 
+                allshootings$State == "MS"| 
+                allshootings$State == "TN"| 
+                allshootings$State == "AR"| 
+                allshootings$State == "LA"| 
+                allshootings$State == "OK"| 
+                allshootings$State == "TX"] <- 3
+
+allshootings$region[allshootings$State == "AZ" | 
+                allshootings$State == "CO"| 
+                allshootings$State == "ID"| 
+                allshootings$State == "MT"| 
+                allshootings$State == "NV"| 
+                allshootings$State == "NM"| 
+                allshootings$State == "UT" |
+                  allshootings$State == "WY"] <- 8 
+
+
+allshootings$region[allshootings$State == "AK"| 
+                allshootings$State == "CA"| 
+                allshootings$State == "HI"| 
+                allshootings$State == "OR"| 
+                allshootings$State == "WA"] <- 4
+
+
+gun_reg <- read.csv("/Users/gcgibson/BayesProject/Gun_Reg.csv")
+
+region_1_gun_reg <- sum(gun_reg[gun_reg$State == "Connecticut",][1,3:ncol(gun_reg)])
++ sum(gun_reg[gun_reg$State == "New Jersey",][1,3:ncol(gun_reg)])
++ sum(gun_reg[gun_reg$State == "New York",][1,3:ncol(gun_reg)])
++ sum(gun_reg[gun_reg$State == "Pennsylvania",][1,3:ncol(gun_reg)])
++ sum(gun_reg[gun_reg$State == "West Virginia",][1,3:ncol(gun_reg)])
+
+
+
+
+region_2_gun_reg <- sum(gun_reg[gun_reg$State == "Minnesota",][1,3:ncol(gun_reg)]) 
++sum(gun_reg[gun_reg$State == "Nebraska",][1,3:ncol(gun_reg)]) 
++sum(gun_reg[gun_reg$State == "Missouri",][1,3:ncol(gun_reg)]) 
++sum(gun_reg[gun_reg$State == "North Dakota",][1,3:ncol(gun_reg)]) 
++sum(gun_reg[gun_reg$State == "South Dakota",][1,3:ncol(gun_reg)]) 
++sum(gun_reg[gun_reg$State == "Kansas",][1,3:ncol(gun_reg)]) 
++sum(gun_reg[gun_reg$State == "Iowa",][1,3:ncol(gun_reg)])
+
+
+
+
+region_3_gun_reg <- sum(gun_reg[gun_reg$State == "Alabama",][1,3:ncol(gun_reg)]) 
++sum(gun_reg[gun_reg$State == "Kentuky",][1,3:ncol(gun_reg)]) 
++sum(gun_reg[gun_reg$State == "Mississippi",][1,3:ncol(gun_reg)]) 
++sum(gun_reg[gun_reg$State == "Tennessee",][1,3:ncol(gun_reg)])
++sum(gun_reg[gun_reg$State == "Arkansas",][1,3:ncol(gun_reg)])
++sum(gun_reg[gun_reg$State == "Louisiana",][1,3:ncol(gun_reg)])
++sum(gun_reg[gun_reg$State == "Oklahoma",][1,3:ncol(gun_reg)])
++sum(gun_reg[gun_reg$State == "Texas",][1,3:ncol(gun_reg)])
+
+
+
+
+
+
+ region_4_gun_reg <- sum(gun_reg[gun_reg$State == "Alaska",][1,3:ncol(gun_reg)]) 
+ + sum(gun_reg[gun_reg$State == "California",][1,3:ncol(gun_reg)])
+ + sum(gun_reg[gun_reg$State == "Hawaii",][1,3:ncol(gun_reg)])
+  + sum(gun_reg[gun_reg$State == "Oregon",][1,3:ncol(gun_reg)])
+  + sum(gun_reg[gun_reg$State == "Washington",][1,3:ncol(gun_reg)])
+
+
+
+
+region_5_gun_reg <- sum(gun_reg[gun_reg$State == "Maine",][1,3:ncol(gun_reg)]) 
++ sum(gun_reg[gun_reg$State == "Massachusetts",][1,3:ncol(gun_reg)]) 
++ sum(gun_reg[gun_reg$State == "New Hampshire",][1,3:ncol(gun_reg)])
++ sum(gun_reg[gun_reg$State == "Rhode Island",][1,3:ncol(gun_reg)])
++ sum(gun_reg[gun_reg$State == "Vermont",][1,3:ncol(gun_reg)])
+
+
+
+region_6_gun_reg <- sum(gun_reg[gun_reg$State == "Illonois",][1,3:ncol(gun_reg)]) 
++ sum(gun_reg[gun_reg$State == "Michigan",][1,3:ncol(gun_reg)]) 
++ sum(gun_reg[gun_reg$State == "Ohio",][1,3:ncol(gun_reg)]) 
++ sum(gun_reg[gun_reg$State == "Wisconsin",][1,3:ncol(gun_reg)]) 
++ sum(gun_reg[gun_reg$State == "Indiana",][1,3:ncol(gun_reg)]) 
+
+
+
+
+region_7_gun_reg <-  sum(gun_reg[gun_reg$State == "Delaware",][1,3:ncol(gun_reg)]) 
++sum(gun_reg[gun_reg$State == "Florida",][1,3:ncol(gun_reg)]) 
++sum(gun_reg[gun_reg$State == "Georgia",][1,3:ncol(gun_reg)]) 
++sum(gun_reg[gun_reg$State == "Maryland",][1,3:ncol(gun_reg)]) 
++sum(gun_reg[gun_reg$State == "North Carolina",][1,3:ncol(gun_reg)])
++sum(gun_reg[gun_reg$State == "South Carolina",][1,3:ncol(gun_reg)]) 
++sum(gun_reg[gun_reg$State == "Virginia",][1,3:ncol(gun_reg)]) 
++sum(gun_reg[gun_reg$State == "Wash D.C",][1,3:ncol(gun_reg)]) 
+
+
+
+region_8_gun_reg <-  sum(gun_reg[gun_reg$State == "Arizona",][1,3:ncol(gun_reg)]) 
++sum(gun_reg[gun_reg$State == "Colorado",][1,3:ncol(gun_reg)]) 
++sum(gun_reg[gun_reg$State == "Idaho",][1,3:ncol(gun_reg)]) 
++sum(gun_reg[gun_reg$State == "Montana",][1,3:ncol(gun_reg)]) 
++sum(gun_reg[gun_reg$State == "New Mexico",][1,3:ncol(gun_reg)])
++sum(gun_reg[gun_reg$State == "Utah",][1,3:ncol(gun_reg)]) 
++sum(gun_reg[gun_reg$State == "Nevada",][1,3:ncol(gun_reg)]) 
++sum(gun_reg[gun_reg$State == "Wyoming",][1,3:ncol(gun_reg)]) 
+
+
+gun_reg_vec <- c(region_1_gun_reg,region_2_gun_reg,region_3_gun_reg,region_4_gun_reg,region_5_gun_reg,region_5_gun_reg,region_7_gun_reg,region_8_gun_reg,0)
+
+
+model <- "model{
+
+    # reference for C and zero trick http://www.medicine.mcgill.ca/epidemiology/Joseph/courses/common/Tricks.html
+    C <- 10000 
+
+    for(j in 1:ntrain){
+      LikCountModel[j] <- pow(mu[j],y[getitrain.j[j]])/y_fact[getitrain.j[j]]*exp(-mu[j])
+      
+    # beta part
+      eta[j] <- beta.j[1,region[j]] + beta.j[2,region[j]]*x2[getitrain.j[j]] + beta.j[3,region[j]]*x3[getitrain.j[j]]   +   beta.j[4,region[j]]*x4[getitrain.j[j]] + beta4*race[getitrain.j[j]] + beta5*age[getitrain.j[j]]
+      
+      mu[j] <- exp(eta[j])
+      #alpha part
+     zeta[j] <- alpha.j[1,region[j]] + alpha.j[2,region[j]]*x2[getitrain.j[j]] + alpha.j[3,region[j]]*x3[getitrain.j[j]]   +   alpha.j[4,region[j]]*x4[getitrain.j[j]] + alpha4*race[getitrain.j[j]] + alpha5*age[getitrain.j[j]]
+      w[j] <- exp(zeta[j])/(1+exp(zeta[j]))
+      
+      #1/0 Tricks: ones is a column containing only ones, with the same size of y
+      p[j] <- L[j] / C
+      ones[j] ~ dbern(p[j])
+      
+      #Full likelihood expression
+      L[j] <- LikCountModel[j] * (1-w[j]) + equals(y[j],0)*w[j]
+      
+    } 
+  
+    for (j in 1:4){
+      mu_beta_vec[j] <- mu_beta 
+    }
+
+    for (j in 1:4){
+      mu_alpha_vec[j] <- mu_alpha 
+    }
+    
+    for (j in 1:J){
+       beta.j[1:4,j] ~ dmnorm( mu_beta_vec, V)
+     
+    }
+  
+     for (j in 1:J){
+       alpha.j[1:4,j] ~ dmnorm( mu_alpha_vec, W)
+     }
+  
+    V ~ dwish(R, 4)
+    W ~ dwish(R, 4)
+    sigma ~ dunif(0,20)
+    alpha4 ~ dnorm(mu.alpha,tau.alpha)
+    alpha5 ~ dnorm(mu.alpha,tau.alpha)
+    beta4 ~ dnorm(mu.beta,tau.beta) 
+    beta5 ~ dnorm(mu.beta,tau.beta) 
+    mu_beta ~ dnorm(0,.01)
+    mu_alpha ~ dnorm(0,.01)
+    
+    r ~ dunif(0,50)
+}"
+
+
+
+dat$region <- allshootings$region
+
+dat$region[is.na(dat$region)] <- 9
+forJags <- list(x1=dat$x.1,
+                x2=dat$x.2,
+                x3=dat$x.3,
+                x4 = dat$x.4,
+                race = dat$race ,
+                age = dat$age,
+                y=dat$y,
+                ones = ones_,# DV
+                y_fact = y_fact,
+                R = diag(c(1,1,1,1)),
+                gun_reg_vec = gun_reg_vec,
+                prec_vec = solve(diag(4)),
+                region = dat$region,
+                J = 9,
+                N=1113,  # sample size
+                mu.beta=0,  # priors centered on 0
+                tau.beta=.01,
+                mu.alpha=0,  # priors centered on 0
+                tau.alpha=.01,
+                mu.gamma = 0,
+                tau.gamma=.01)  # diffuse priors
+
+
+parnames <- c( "beta.j","mu","beta4","beta5")
+
+train_index <- sample(1:1113,890)
+test_index <- setdiff(1:1113,train_index)
+
+
+forJags$getitrain.j <- train_index
+forJags$getitest.j <- test_index
+forJags$ntrain <- length(train_index)
+
+
+
+mod <- jags(data = forJags, 
+                    parameters.to.save=parnames, 
+                    n.chains = 3, n.burnin = 1500, n.iter =1500 + 5000, n.thin = 10, model.file = textConnection(model))
+
+mcmc.array <- mod$BUGSoutput$sims.array
+
+library(shinystan)
+#my_sso <- launch_shinystan(as.shinystan(mod$BUGSoutput$sims.array))
+
+
+
+print ("Regional effect of rifle ")
+for (j in 1:8){
+  print (quantile(mod$BUGSoutput$sims.list$beta.j[,2,j],c(.025,.975)))
+
+}
+print (quantile(mod$BUGSoutput$sims.array[,,"gamma0"]))
+
+```
+
+
+
+Since we can't explicity encode yrep in the model, we have to use the samples of the parameters of the training set. For simplicity, we focus only on the first region. Technically, we should also include the alphas, but to keep things simple we will consider posterior-predictive only based on the betas. 
+
+
+
+```{r}
+beta_star_j <- mod$BUGSoutput$sims.list$beta.j[,,1]
+
+beta_star_0 <- beta_star_j[,1]
+beta_star_1 <- beta_star_j[,2]
+beta_star_2 <- beta_star_j[,3]
+beta_star_3 <- beta_star_j[,4]
+
+beta_star_4 <- mod$BUGSoutput$sims.array[,,"beta4"]
+beta_star_5 <- mod$BUGSoutput$sims.array[,,"beta5"]
+
+
+yrep_zinb <- matrix(NA,nrow = length(test_index),ncol=100)
+count <- 1
+for (i in test_index){
+  tmp <- c()
+  for (mc_sample in 1:100){
+    tmp <- c(tmp,rpois(1,exp(beta_star_0[mc_sample] + beta_star_1[mc_sample]*dat$x.2[i] + beta_star_2[mc_sample]*dat$x.3[i] +beta_star_3[mc_sample]*dat$x.4[i] + beta_star_4[mc_sample]*dat$race[i] + beta_star_5[mc_sample]*dat$age[i] )))
+  }
+  yrep_zinb[count,] <- tmp
+  count <- count +1
+}
+
+plot(test_index,rowMeans(yrep_zinb) - dat$y[test_index],ylab="y_hat_i - y_i",xlab="Test Index",main="Out of sample predictions")
+
+
+```
+
+
+We can now examine the coverage probability. We do this by asking if the true observation falls within the 95% credible interval given by the monte carlo samples.
+
+```{r}
+correct <- 0
+for (i in 1:nrow(yrep_zinb)){
+  true_y <- dat$y[train_index[i]]
+  if (true_y >= quantile(yrep_zinb[i,],.025) && true_y <= quantile(yrep_zinb[i,],.975)){
+    correct <- correct + 1
+  }
+  
+}
+
+print ("Empirical coverage probability")
+print (correct/nrow(yrep_zinb))
+```
+
+Pretty low coverage probability but I'm not sure how to handle the fact that this is a discrete distribution. 
+
+
+### 3
+
+Lets examine what happens when we instead leave out observations not at random, but according to time. Suppose we leave out the first 20% of observations
+
+
+```{r}
+train_index <- 223:1113
+test_index <- 1:223
+
+
+forJags$getitrain.j <- train_index
+forJags$getitest.j <- test_index
+forJags$ntrain <- length(train_index)
+mod <- jags(data = forJags, 
+                    parameters.to.save=parnames, 
+                    n.chains = 3, n.burnin = 1500, n.iter =1500 + 5000, n.thin = 10, model.file = textConnection(model))
+```
+
+
+```{r}
+beta_star_j <- mod$BUGSoutput$sims.list$beta.j[,,1]
+
+beta_star_0 <- beta_star_j[,1]
+beta_star_1 <- beta_star_j[,2]
+beta_star_2 <- beta_star_j[,3]
+beta_star_3 <- beta_star_j[,4]
+
+beta_star_4 <- mod$BUGSoutput$sims.array[,,"beta4"]
+beta_star_5 <- mod$BUGSoutput$sims.array[,,"beta5"]
+
+
+yrep_zinb <- matrix(NA,nrow = length(test_index),ncol=100)
+count <- 1
+for (i in test_index){
+  tmp <- c()
+  for (mc_sample in 1:100){
+    tmp <- c(tmp,rpois(1,exp(beta_star_0[mc_sample] + beta_star_1[mc_sample]*dat$x.2[i] + beta_star_2[mc_sample]*dat$x.3[i] +beta_star_3[mc_sample]*dat$x.4[i] + beta_star_4[mc_sample]*dat$race[i] + beta_star_5[mc_sample]*dat$age[i] )))
+  }
+  yrep_zinb[count,] <- tmp
+  count <- count +1
+}
+
+plot(test_index,rowMeans(yrep_zinb) - dat$y[test_index],ylab="y_hat_i - y_i",xlab="Test Index",main="Out of sample predictions")
+
+
+correct <- 0
+for (i in 1:nrow(yrep_zinb)){
+  true_y <- dat$y[train_index[i]]
+  if (true_y >= quantile(yrep_zinb[i,],.025) && true_y <= quantile(yrep_zinb[i,],.975)){
+    correct <- correct + 1
+  }
+  
+}
+
+print ("Empirical coverage probability")
+print (correct/nrow(yrep_zinb))
+```
+
+
+
+```{r}
+loglike1.model2<- mod2$BUGSoutput$sims.list$L
+loo2 <- loo(loglike1.model2)
+print (loo2$elpd_loo)
+
+
+
+psis2 <- psislw(-loglike1.model2)
+lw2 <- psis2$lw_smooth
+ppc_loo_pit_overlay(
+  y = dat$y,
+  yrep = t(yrep.i_zinb),
+  lw = lw2
+)
+```
+
