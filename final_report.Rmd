@@ -11,9 +11,9 @@ output:
 knitr::opts_chunk$set(echo = TRUE)
 ```
 
-### 1)
+## Model Description
 $$Pr(y_i = j ) = \begin{cases}
-\pi_i  + (1-\pi_i)g(y_i = 0) & j=0 \\
+\pi_i   & j=0 \\
 (1-\pi_i)g(y_i ) & j >0 
 \end{cases}$$
 
@@ -57,12 +57,17 @@ $$
 $$\sigma \sim InvWeishart()$$
 $$\Gamma \sim InvWeishart()$$
 
+$$\mu_{\beta} \sim N(0,100)$$
+$$\mu_{\alpha} \sim N(0,100)$$
+
+NEED MORE HERE 
 
 
+## JAGS MODEL 
 
-### 2)
+NEED TO INCLUDE REGION DIAGRAM HERE
 
-```{r}
+```{r, message=FALSE,echo=FALSE,warning=FALSE}
 library(readr)
 library(ggplot2)
 library(rjags)
@@ -413,8 +418,12 @@ mcmc.array <- mod$BUGSoutput$sims.array
 library(shinystan)
 #my_sso <- launch_shinystan(as.shinystan(mod$BUGSoutput$sims.array))
 
+```
 
 
+## Inference
+
+```{r,echo=FALSE}
 print ("Regional effect of rifle ")
 for (j in 1:8){
   print (quantile(mod$BUGSoutput$sims.list$beta.j[,2,j],c(.025,.975)))
@@ -424,14 +433,12 @@ for (j in 1:8){
 ```
 
 
-
-I think this is the way to properly generate samples of yrep
-
+## Diagnostics
 
 
 
 
-```{r}
+```{r,echo=FALSE}
 library(boot)
 
 ### Data needs to be a dataframe with 
@@ -511,17 +518,20 @@ yrep_mean <- rowMeans(yrep)
 plot(yrep_mean - dat$y[train_index])
 
 #out of  sample
-yrep <- generate_yrep_from_mcmc(mod,400,dat[test_index,])
-yrep_mean <- rowMeans(yrep)
-plot(yrep_mean,lty=1,type="l")
-lines(dat$y[test_index])
+yrep_test <- generate_yrep_from_mcmc(mod,400,dat[test_index,])
+yrep_mean_test <- rowMeans(yrep_test)
+plot(yrep_mean_test[1:20],lty=1,type="l",col="blue",ylim=c(0,30),main="Out of sample predictions on the test set",ylab="yhat | y_train - y_true ")
+lines(dat$y[test_index][1:20])
+legend("topleft", legend=c("yhat", "ytrue"),
+       col=c("blue", "black"), lty=1:2, cex=0.8)
 
 ```
 
 
 We can now examine the coverage probability. We do this by asking if the true observation falls within the 95% credible interval given by the monte carlo samples.
+### Coverage Probability
 
-```{r}
+```{r,echo=FALSE}
 correct <- 0
 for (i in 1:nrow(yrep)){
   true_y <- dat$y[train_index[i]]
@@ -536,14 +546,15 @@ print (correct/nrow(yrep))
 ```
 
 
-
+### ELPD AND PIT-LOO
 ```{r}
 library(loo)
 library(bayesplot)
 loglike1.model2<- mod$BUGSoutput$sims.list$L
 loo2 <- loo(loglike1.model2)
 print (loo2$elpd_loo)
-
+plot(loo2$pointwise[, "elpd_loo"]  ~ dat$x.1[train_index], pch = 19,xlab="Rifle Indicator",      ylab = "ELPD model 1",ylim=c(-10,2))
+ abline(h=0)
 
 
 psis2 <- psislw(-loglike1.model2)
