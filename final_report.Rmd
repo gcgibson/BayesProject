@@ -9,8 +9,39 @@ output:
 
 ```{r setup, include=FALSE}
 knitr::opts_chunk$set(echo = TRUE)
-```
+knitr::opts_chunk$set(cache=TRUE)
 
+```
+## Introduction
+
+School shootings have become much more prominent in the media in recent years, which has encouraged a push for more gun regulation and control. Are assault rifles associated with a higher number of victims in a school shooting?
+\begin{itemize}
+\item We have heard arguments on both sides of the assault rifle legislation issue. Here we take a statistical approach to answer the question: are assault rifles associated with a higher number of victims in a mass shooting within a school?
+
+\item Outcome is distributed Poisson 
+
+\item gun type is encoded dummy variable (4 categories), reference category is handgun
+
+\item Control for age and race of shooter (using centered values)
+\item $n=1113$ , $J = 8$
+\end{itemize}
+
+## Data
+Obtained through an independent source. Contains detailed information about shootings dating back to 1842.
+Our Analysis: Focus on 1991 onward.
+
+![School Shootings](/Users/gcgibson/BayesProject/shootingcountperyear.png){width=50%}
+![School Shootings](/Users/gcgibson/BayesProject/Region_ID.png){width=50%}
+
+
+
+\begin{itemize}
+\item Lots of zeros present - what do they define as a shooting?
+
+\item Use zero-inflated model because \textbf{gun type has no effect on number of victims if there aren't any}
+
+\item Not a lot of shootings per state (not exactly a bad thing) , so trade-off between sample size per cluster and number of clusters was difficult
+\end{itemize}
 ## Model Description
 $$Pr(y_i = j ) = \begin{cases}
 \pi_i   & j=0 \\
@@ -67,7 +98,7 @@ NEED MORE HERE
 
 NEED TO INCLUDE REGION DIAGRAM HERE
 
-```{r, message=FALSE,echo=FALSE,warning=FALSE}
+```{r, message=FALSE,echo=FALSE,warning=FALSE,out.width = "50%"}
 library(readr)
 library(ggplot2)
 library(rjags)
@@ -356,7 +387,10 @@ forJags <- list(
 
 parnames <- c( "beta.j","mu","beta4","beta5","alpha.j","alpha4","alpha5","L")
 
-train_index <-sample(1:1113,780)
+
+
+### FULL RUN
+train_index <- 1:1113#sample(1:1113,780)
 test_index <- setdiff(1:1113,train_index)
 
 
@@ -373,7 +407,7 @@ mod <- jags(data = forJags,
 mcmc.array <- mod$BUGSoutput$sims.array
 
 library(shinystan)
-#my_sso <- launch_shinystan(as.shinystan(mod$BUGSoutput$sims.array))
+my_sso <- launch_shinystan(as.shinystan(mod$BUGSoutput$sims.array))
 
 ```
 
@@ -384,18 +418,38 @@ library(shinystan)
 print ("Regional effect of rifle ")
 for (j in 1:8){
   print (quantile(mod$BUGSoutput$sims.list$beta.j[,2,j],c(.025,.975)))
-
 }
 
 ```
 
+We can see from the $95\%$ quantiles of the fitting that region $3,4,6$ have a positive effect of Rifle on umber of victims, and the remaining regions have no effect. 
+
 
 ## Diagnostics
+![School Shootings](/Users/gcgibson/BayesProject/traceplot.png){width=50%}
+
+
+```{r, echo=FALSE,message=FALSE}
+### TRAIN/TEST RUN
+train_index <- sample(1:1113,780)
+test_index <- setdiff(1:1113,train_index)
+
+
+forJags$getitrain.j <- train_index
+forJags$getitest.j <- test_index
+forJags$ntrain <- length(train_index)
 
 
 
+mod <- jags(data = forJags, 
+                    parameters.to.save=parnames, 
+                    n.chains = 4, n.burnin = 1500, n.iter =1500 + 1000, n.thin = 10, model.file = textConnection(model))
 
-```{r,echo=FALSE}
+mcmc.array <- mod$BUGSoutput$sims.array
+```
+
+
+```{r,echo=FALSE,out.width = "50%"}
 library(boot)
 
 ### Data needs to be a dataframe with 
@@ -488,7 +542,7 @@ legend("topleft", legend=c("yhat", "ytrue"),
 We can now examine the coverage probability. We do this by asking if the true observation falls within the 95% credible interval given by the monte carlo samples.
 ### Coverage Probability
 
-```{r,echo=FALSE}
+```{r,echo=FALSE,out.width = "50%"}
 correct <- 0
 for (i in 1:nrow(yrep)){
   true_y <- dat$y[train_index[i]]
@@ -504,7 +558,7 @@ print (correct/nrow(yrep))
 
 
 ### ELPD AND PIT-LOO
-```{r}
+```{r,out.width = "50%"}
 library(loo)
 library(bayesplot)
 loglike1.model2<- mod$BUGSoutput$sims.list$L
@@ -522,4 +576,6 @@ ppc_loo_pit_overlay(
   lw = lw2
 )
 ```
+
+
 
