@@ -433,66 +433,88 @@ I think this is the way to properly generate samples of yrep
 
 ```{r}
 library(boot)
-ncols <- 400
-beta_star_j <- mod$BUGSoutput$sims.list$beta.j[,,1]
 
-beta_star_0 <- beta_star_j[,1]
-beta_star_1 <- beta_star_j[,2]
-beta_star_2 <- beta_star_j[,3]
-beta_star_3 <- beta_star_j[,4]
-
-beta_star_4 <- mod$BUGSoutput$sims.array[,,"beta4"]
-beta_star_5 <- mod$BUGSoutput$sims.array[,,"beta5"]
-
-alpha_star_j <- mod$BUGSoutput$sims.list$beta.j[,,1]
-
-alpha_star_0 <- beta_star_j[,1]
-alpha_star_1 <- beta_star_j[,2]
-alpha_star_2 <- beta_star_j[,3]
-alpha_star_3 <- beta_star_j[,4]
-
-alpha_star_4 <- mod$BUGSoutput$sims.array[,,"alpha4"]
-alpha_star_5 <- mod$BUGSoutput$sims.array[,,"alpha5"]
+### Data needs to be a dataframe with 
+### x2
+### x3
+### x4
+### age
+### race 
 
 
-log_lambda <- matrix(NA,nrow = length(train_index),ncol=ncols)
 
-
-count <- 1
-for (i in train_index){
-  tmp <- c()
-  for (mc_sample in 1:ncols){
-    tmp <- c(tmp,exp(beta_star_0[mc_sample] + beta_star_1[mc_sample]*dat$x.2[i] + beta_star_2[mc_sample]*dat$x.3[i] +beta_star_3[mc_sample]*dat$x.4[i] + beta_star_4[mc_sample]*dat$race[i] + beta_star_5[mc_sample]*dat$age[i] ))
+generate_yrep_from_mcmc <- function(mod,nsamples,data){
+  ncols <- nsamples
+  beta_star_j <- mod$BUGSoutput$sims.list$beta.j[,,1]
+  
+  beta_star_0 <- beta_star_j[,1]
+  beta_star_1 <- beta_star_j[,2]
+  beta_star_2 <- beta_star_j[,3]
+  beta_star_3 <- beta_star_j[,4]
+  
+  beta_star_4 <- mod$BUGSoutput$sims.array[,,"beta4"]
+  beta_star_5 <- mod$BUGSoutput$sims.array[,,"beta5"]
+  
+  alpha_star_j <- mod$BUGSoutput$sims.list$beta.j[,,1]
+  
+  alpha_star_0 <- beta_star_j[,1]
+  alpha_star_1 <- beta_star_j[,2]
+  alpha_star_2 <- beta_star_j[,3]
+  alpha_star_3 <- beta_star_j[,4]
+  
+  alpha_star_4 <- mod$BUGSoutput$sims.array[,,"alpha4"]
+  alpha_star_5 <- mod$BUGSoutput$sims.array[,,"alpha5"]
+  
+  
+  log_lambda <- matrix(NA,nrow = nrow(data),ncol=ncols)
+  
+  
+  count <- 1
+  for (i in 1:nrow(data)){
+    tmp <- c()
+    for (mc_sample in 1:ncols){
+      tmp <- c(tmp,exp(beta_star_0[mc_sample] + beta_star_1[mc_sample]*data$x.2[i] + beta_star_2[mc_sample]*data$x.3[i] +beta_star_3[mc_sample]*data$x.4[i] + beta_star_4[mc_sample]*data$race[i] + beta_star_5[mc_sample]*data$age[i] ))
+    }
+    log_lambda[count,] <- tmp
+    count <- count +1
   }
-  log_lambda[count,] <- tmp
-  count <- count +1
+  
+  
+  logit_pi <- matrix(NA,nrow = length(train_index),ncol=ncols)
+  
+  count <- 1
+  for (i in 1:nrow(data)){
+    tmp <- c()
+    for (mc_sample in 1:ncols){
+      tmp <- c(tmp,inv.logit(alpha_star_0[mc_sample] + alpha_star_1[mc_sample]*data$x.2[i] + alpha_star_2[mc_sample]*data$x.3[i] +alpha_star_3[mc_sample]*data$x.4[i] + alpha_star_4[mc_sample]*data$race[i] + alpha_star_5[mc_sample]*data$age[i] ))
+    }
+    logit_pi[count,] <- tmp
+    count <- count +1
+  }
+  
+  
+  yrep <- matrix(NA,nrow= nrow(data),ncol=ncols)
+  
+  for (i in 1:nrow(data)){
+    for (j in 1:ncols){
+      zero_part <- rbinom(1,1,logit_pi[i,j])
+      yrep[i,j] <- zero_part*rpois(1,log_lambda[i,j])
+    }
+  }
+  return (yrep)
 }
 
 
-logit_pi <- matrix(NA,nrow = length(train_index),ncol=ncols)
-
-count <- 1
-for (i in train_index){
-  tmp <- c()
-  for (mc_sample in 1:ncols){
-    tmp <- c(tmp,inv.logit(alpha_star_0[mc_sample] + alpha_star_1[mc_sample]*dat$x.2[i] + alpha_star_2[mc_sample]*dat$x.3[i] +alpha_star_3[mc_sample]*dat$x.4[i] + alpha_star_4[mc_sample]*dat$race[i] + alpha_star_5[mc_sample]*dat$age[i] ))
-  }
-  logit_pi[count,] <- tmp
-  count <- count +1
-}
-
-
-yrep <- matrix(NA,nrow= length(train_index),ncol=ncols)
-
-for (i in 1:length(train_index)){
-  for (j in 1:ncols){
-    zero_part <- rbinom(1,1,logit_pi[i,j])
-    yrep[i,j] <- zero_part*rpois(1,log_lambda[i,j])
-  }
-}
-
+#in sample
+yrep <- generate_yrep_from_mcmc(mod,400,dat[train_index,])
 yrep_mean <- rowMeans(yrep)
 plot(yrep_mean - dat$y[train_index])
+
+#out of  sample
+yrep <- generate_yrep_from_mcmc(mod,400,dat[test_index,])
+yrep_mean <- rowMeans(yrep)
+plot(yrep_mean,lty=1,type="l")
+lines(dat$y[test_index])
 
 ```
 
