@@ -577,5 +577,37 @@ ppc_loo_pit_overlay(
 )
 ```
 
+```{r}
+library(onehot)
+wc <- data.frame(allshootings$Weapon.s..Categories)
+encoder <- onehot(wc, addNA=TRUE)
+x <- predict(encoder,wc)
+x[is.na(x)] <-0
+model <- "
+model  {
+  for (i in 1:n){
+    weapon_type[i,1:J] ~ dmulti(p[1:J], 1)
+   
+  }
+  for (j in 1:J){
+      logit_p[j] <- beta0 + beta1*gun_reg
+      p[j] <- exp(logit_p[j])/(1+exp(logit_p[j]))
+  }
+  
+  beta0 ~ dnorm(0,.01)
+  beta1 ~ dnorm(0,.01)
+} # end model
+"
+J <- 10
+fake_data <- matrix(NA, nrow = 1000, ncol=J)
 
+for (i in 1:1000){
+  fake_data[i,] <-t(rmultinom(1,10,rep(1/J,J)))
+}
+#x <- x + 50
+jag.data <- list(weapon_type = x,gun_reg=10, J=J, n=nrow(x), ones = rep(1,J))
 
+parname <- c("p")
+
+mod <- jags(data = jag.data, parameters.to.save=parname, n.chains = 3, n.burnin = 1000, n.iter = 2500+1000, model.file = textConnection(model))
+```
