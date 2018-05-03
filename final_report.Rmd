@@ -229,85 +229,42 @@ allshootings$region[allshootings$State == "AK"|
 
 gun_reg <- read.csv("/Users/gcgibson/BayesProject/Gun_Reg.csv")
 
-region_1_gun_reg <- sum(gun_reg[gun_reg$State == "Connecticut",][1,3:ncol(gun_reg)])
-+ sum(gun_reg[gun_reg$State == "New Jersey",][1,3:ncol(gun_reg)])
-+ sum(gun_reg[gun_reg$State == "New York",][1,3:ncol(gun_reg)])
-+ sum(gun_reg[gun_reg$State == "Pennsylvania",][1,3:ncol(gun_reg)])
-+ sum(gun_reg[gun_reg$State == "West Virginia",][1,3:ncol(gun_reg)])
+region_1_gun_reg <- sum(gun_reg[gun_reg$State == "Connecticut",][1,3:ncol(gun_reg)])+ sum(gun_reg[gun_reg$State == "New Jersey",][1,3:ncol(gun_reg)])+ sum(gun_reg[gun_reg$State == "New York",][1,3:ncol(gun_reg)])+ sum(gun_reg[gun_reg$State == "Pennsylvania",][1,3:ncol(gun_reg)])+ sum(gun_reg[gun_reg$State == "West Virginia",][1,3:ncol(gun_reg)])
 
 
 
 
-region_2_gun_reg <- sum(gun_reg[gun_reg$State == "Minnesota",][1,3:ncol(gun_reg)]) 
-+sum(gun_reg[gun_reg$State == "Nebraska",][1,3:ncol(gun_reg)]) 
-+sum(gun_reg[gun_reg$State == "Missouri",][1,3:ncol(gun_reg)]) 
-+sum(gun_reg[gun_reg$State == "North Dakota",][1,3:ncol(gun_reg)]) 
-+sum(gun_reg[gun_reg$State == "South Dakota",][1,3:ncol(gun_reg)]) 
-+sum(gun_reg[gun_reg$State == "Kansas",][1,3:ncol(gun_reg)]) 
-+sum(gun_reg[gun_reg$State == "Iowa",][1,3:ncol(gun_reg)])
+region_2_gun_reg <- sum(gun_reg[gun_reg$State == "Minnesota",][1,3:ncol(gun_reg)]) +sum(gun_reg[gun_reg$State == "Nebraska",][1,3:ncol(gun_reg)]) +sum(gun_reg[gun_reg$State == "Missouri",][1,3:ncol(gun_reg)]) +sum(gun_reg[gun_reg$State == "North Dakota",][1,3:ncol(gun_reg)]) +sum(gun_reg[gun_reg$State == "South Dakota",][1,3:ncol(gun_reg)]) +sum(gun_reg[gun_reg$State == "Kansas",][1,3:ncol(gun_reg)]) +sum(gun_reg[gun_reg$State == "Iowa",][1,3:ncol(gun_reg)])
 
 
 
 
-region_3_gun_reg <- sum(gun_reg[gun_reg$State == "Alabama",][1,3:ncol(gun_reg)]) 
-+sum(gun_reg[gun_reg$State == "Kentuky",][1,3:ncol(gun_reg)]) 
-+sum(gun_reg[gun_reg$State == "Mississippi",][1,3:ncol(gun_reg)]) 
-+sum(gun_reg[gun_reg$State == "Tennessee",][1,3:ncol(gun_reg)])
-+sum(gun_reg[gun_reg$State == "Arkansas",][1,3:ncol(gun_reg)])
-+sum(gun_reg[gun_reg$State == "Louisiana",][1,3:ncol(gun_reg)])
-+sum(gun_reg[gun_reg$State == "Oklahoma",][1,3:ncol(gun_reg)])
-+sum(gun_reg[gun_reg$State == "Texas",][1,3:ncol(gun_reg)])
+region_3_gun_reg <- sum(gun_reg[gun_reg$State == "Alabama",][1,3:ncol(gun_reg)]) +sum(gun_reg[gun_reg$State == "Kentuky",][1,3:ncol(gun_reg)]) +sum(gun_reg[gun_reg$State == "Mississippi",][1,3:ncol(gun_reg)]) +sum(gun_reg[gun_reg$State == "Tennessee",][1,3:ncol(gun_reg)])+sum(gun_reg[gun_reg$State == "Arkansas",][1,3:ncol(gun_reg)])+sum(gun_reg[gun_reg$State == "Louisiana",][1,3:ncol(gun_reg)])+sum(gun_reg[gun_reg$State == "Oklahoma",][1,3:ncol(gun_reg)])+sum(gun_reg[gun_reg$State == "Texas",][1,3:ncol(gun_reg)])
 
 
 
 
 
 
- region_4_gun_reg <- sum(gun_reg[gun_reg$State == "Alaska",][1,3:ncol(gun_reg)]) 
- + sum(gun_reg[gun_reg$State == "California",][1,3:ncol(gun_reg)])
- + sum(gun_reg[gun_reg$State == "Hawaii",][1,3:ncol(gun_reg)])
-  + sum(gun_reg[gun_reg$State == "Oregon",][1,3:ncol(gun_reg)])
-  + sum(gun_reg[gun_reg$State == "Washington",][1,3:ncol(gun_reg)])
+ region_4_gun_reg <- sum(gun_reg[gun_reg$State == "Alaska",][1,3:ncol(gun_reg)]) + sum(gun_reg[gun_reg$State == "California",][1,3:ncol(gun_reg)])+ sum(gun_reg[gun_reg$State == "Hawaii",][1,3:ncol(gun_reg)])+ sum(gun_reg[gun_reg$State == "Oregon",][1,3:ncol(gun_reg)])+ sum(gun_reg[gun_reg$State == "Washington",][1,3:ncol(gun_reg)])
 
 
 
 
-region_5_gun_reg <- sum(gun_reg[gun_reg$State == "Maine",][1,3:ncol(gun_reg)]) 
-+ sum(gun_reg[gun_reg$State == "Massachusetts",][1,3:ncol(gun_reg)]) 
-+ sum(gun_reg[gun_reg$State == "New Hampshire",][1,3:ncol(gun_reg)])
-+ sum(gun_reg[gun_reg$State == "Rhode Island",][1,3:ncol(gun_reg)])
-+ sum(gun_reg[gun_reg$State == "Vermont",][1,3:ncol(gun_reg)])
+region_5_gun_reg <- sum(gun_reg[gun_reg$State == "Maine",][1,3:ncol(gun_reg)]) + sum(gun_reg[gun_reg$State == "Massachusetts",][1,3:ncol(gun_reg)]) + sum(gun_reg[gun_reg$State == "New Hampshire",][1,3:ncol(gun_reg)])+ sum(gun_reg[gun_reg$State == "Rhode Island",][1,3:ncol(gun_reg)])+ sum(gun_reg[gun_reg$State == "Vermont",][1,3:ncol(gun_reg)])
 
 
 
-region_6_gun_reg <- sum(gun_reg[gun_reg$State == "Illonois",][1,3:ncol(gun_reg)]) 
-+ sum(gun_reg[gun_reg$State == "Michigan",][1,3:ncol(gun_reg)]) 
-+ sum(gun_reg[gun_reg$State == "Ohio",][1,3:ncol(gun_reg)]) 
-+ sum(gun_reg[gun_reg$State == "Wisconsin",][1,3:ncol(gun_reg)]) 
-+ sum(gun_reg[gun_reg$State == "Indiana",][1,3:ncol(gun_reg)]) 
+region_6_gun_reg <- sum(gun_reg[gun_reg$State == "Illonois",][1,3:ncol(gun_reg)]) + sum(gun_reg[gun_reg$State == "Michigan",][1,3:ncol(gun_reg)]) + sum(gun_reg[gun_reg$State == "Ohio",][1,3:ncol(gun_reg)]) + sum(gun_reg[gun_reg$State == "Wisconsin",][1,3:ncol(gun_reg)]) + sum(gun_reg[gun_reg$State == "Indiana",][1,3:ncol(gun_reg)]) 
 
 
 
 
-region_7_gun_reg <-  sum(gun_reg[gun_reg$State == "Delaware",][1,3:ncol(gun_reg)]) 
-+sum(gun_reg[gun_reg$State == "Florida",][1,3:ncol(gun_reg)]) 
-+sum(gun_reg[gun_reg$State == "Georgia",][1,3:ncol(gun_reg)]) 
-+sum(gun_reg[gun_reg$State == "Maryland",][1,3:ncol(gun_reg)]) 
-+sum(gun_reg[gun_reg$State == "North Carolina",][1,3:ncol(gun_reg)])
-+sum(gun_reg[gun_reg$State == "South Carolina",][1,3:ncol(gun_reg)]) 
-+sum(gun_reg[gun_reg$State == "Virginia",][1,3:ncol(gun_reg)]) 
-+sum(gun_reg[gun_reg$State == "Wash D.C",][1,3:ncol(gun_reg)]) 
+region_7_gun_reg <-  sum(gun_reg[gun_reg$State == "Delaware",][1,3:ncol(gun_reg)]) +sum(gun_reg[gun_reg$State == "Florida",][1,3:ncol(gun_reg)]) +sum(gun_reg[gun_reg$State == "Georgia",][1,3:ncol(gun_reg)]) +sum(gun_reg[gun_reg$State == "Maryland",][1,3:ncol(gun_reg)]) +sum(gun_reg[gun_reg$State == "North Carolina",][1,3:ncol(gun_reg)])+sum(gun_reg[gun_reg$State == "South Carolina",][1,3:ncol(gun_reg)]) +sum(gun_reg[gun_reg$State == "Virginia",][1,3:ncol(gun_reg)]) +sum(gun_reg[gun_reg$State == "Wash D.C",][1,3:ncol(gun_reg)]) 
 
 
 
-region_8_gun_reg <-  sum(gun_reg[gun_reg$State == "Arizona",][1,3:ncol(gun_reg)]) 
-+sum(gun_reg[gun_reg$State == "Colorado",][1,3:ncol(gun_reg)]) 
-+sum(gun_reg[gun_reg$State == "Idaho",][1,3:ncol(gun_reg)]) 
-+sum(gun_reg[gun_reg$State == "Montana",][1,3:ncol(gun_reg)]) 
-+sum(gun_reg[gun_reg$State == "New Mexico",][1,3:ncol(gun_reg)])
-+sum(gun_reg[gun_reg$State == "Utah",][1,3:ncol(gun_reg)]) 
-+sum(gun_reg[gun_reg$State == "Nevada",][1,3:ncol(gun_reg)]) 
-+sum(gun_reg[gun_reg$State == "Wyoming",][1,3:ncol(gun_reg)]) 
+region_8_gun_reg <-  sum(gun_reg[gun_reg$State == "Arizona",][1,3:ncol(gun_reg)]) +sum(gun_reg[gun_reg$State == "Colorado",][1,3:ncol(gun_reg)]) +sum(gun_reg[gun_reg$State == "Idaho",][1,3:ncol(gun_reg)]) +sum(gun_reg[gun_reg$State == "Montana",][1,3:ncol(gun_reg)]) +sum(gun_reg[gun_reg$State == "New Mexico",][1,3:ncol(gun_reg)])+sum(gun_reg[gun_reg$State == "Utah",][1,3:ncol(gun_reg)]) +sum(gun_reg[gun_reg$State == "Nevada",][1,3:ncol(gun_reg)]) +sum(gun_reg[gun_reg$State == "Wyoming",][1,3:ncol(gun_reg)]) 
 
 
 gun_reg_vec <- c(region_1_gun_reg,region_2_gun_reg,region_3_gun_reg,region_4_gun_reg,region_5_gun_reg,region_5_gun_reg,region_7_gun_reg,region_8_gun_reg,0)
