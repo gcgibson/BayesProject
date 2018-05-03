@@ -327,9 +327,12 @@ model <- "model{
       #1/0 Tricks: ones is a column containing only ones, with the same size of y
       p[j] <- L[j] / C
       ones[j] ~ dbern(p[j])
-      
+
+
+      indicator[j] <- ifelse(y[j] > 0, 1, 0)
+
       #Full likelihood expression
-      L[j] <- LikCountModel[j] * (1-w[j]) + equals(y[j],0)*w[j]
+      L[j] <- indicator[j]*LikCountModel[j] * (1-w[j]) + equals(y[j],0)*w[j]
       
     } 
   
@@ -368,7 +371,7 @@ model <- "model{
 dat$region <- allshootings$region
 
 dat$region[is.na(dat$region)] <- 9
-forJags <- list(x1=dat$x.1,
+forJags <- list(
                 x2=dat$x.2,
                 x3=dat$x.3,
                 x4 = dat$x.4,
@@ -382,18 +385,16 @@ forJags <- list(x1=dat$x.1,
                 prec_vec = solve(diag(4)),
                 region = dat$region,
                 J = 9,
-                N=1113,  # sample size
                 mu.beta=0,  # priors centered on 0
-                tau.beta=.01,
+                tau.beta=.1,
                 mu.alpha=0,  # priors centered on 0
-                tau.alpha=.01,
-                mu.gamma = 0,
-                tau.gamma=.01)  # diffuse priors
+                tau.alpha=.1
+                )  # diffuse priors
 
 
-parnames <- c( "beta.j","mu","beta4","beta5")
+parnames <- c( "beta.j","mu","beta4","beta5","alpha.j","alpha4","alpha5","L")
 
-train_index <- sample(1:1113,890)
+train_index <-sample(1:1113,780)
 test_index <- setdiff(1:1113,train_index)
 
 
@@ -405,7 +406,7 @@ forJags$ntrain <- length(train_index)
 
 mod <- jags(data = forJags, 
                     parameters.to.save=parnames, 
-                    n.chains = 3, n.burnin = 1500, n.iter =1500 + 5000, n.thin = 10, model.file = textConnection(model))
+                    n.chains = 4, n.burnin = 1500, n.iter =1500 + 1000, n.thin = 10, model.file = textConnection(model))
 
 mcmc.array <- mod$BUGSoutput$sims.array
 
@@ -419,17 +420,20 @@ for (j in 1:8){
   print (quantile(mod$BUGSoutput$sims.list$beta.j[,2,j],c(.025,.975)))
 
 }
-print (quantile(mod$BUGSoutput$sims.array[,,"gamma0"]))
 
 ```
 
 
 
-Since we can't explicity encode yrep in the model, we have to use the samples of the parameters of the training set. For simplicity, we focus only on the first region. Technically, we should also include the alphas, but to keep things simple we will consider posterior-predictive only based on the betas. 
+I think this is the way to properly generate samples of yrep
+
+
 
 
 
 ```{r}
+library(boot)
+ncols <- 400
 beta_star_j <- mod$BUGSoutput$sims.list$beta.j[,,1]
 
 beta_star_0 <- beta_star_j[,1]
@@ -440,20 +444,55 @@ beta_star_3 <- beta_star_j[,4]
 beta_star_4 <- mod$BUGSoutput$sims.array[,,"beta4"]
 beta_star_5 <- mod$BUGSoutput$sims.array[,,"beta5"]
 
+alpha_star_j <- mod$BUGSoutput$sims.list$beta.j[,,1]
 
-yrep_zinb <- matrix(NA,nrow = length(test_index),ncol=100)
+alpha_star_0 <- beta_star_j[,1]
+alpha_star_1 <- beta_star_j[,2]
+alpha_star_2 <- beta_star_j[,3]
+alpha_star_3 <- beta_star_j[,4]
+
+alpha_star_4 <- mod$BUGSoutput$sims.array[,,"alpha4"]
+alpha_star_5 <- mod$BUGSoutput$sims.array[,,"alpha5"]
+
+
+log_lambda <- matrix(NA,nrow = length(train_index),ncol=ncols)
+
+
 count <- 1
-for (i in test_index){
+for (i in train_index){
   tmp <- c()
-  for (mc_sample in 1:100){
-    tmp <- c(tmp,rpois(1,exp(beta_star_0[mc_sample] + beta_star_1[mc_sample]*dat$x.2[i] + beta_star_2[mc_sample]*dat$x.3[i] +beta_star_3[mc_sample]*dat$x.4[i] + beta_star_4[mc_sample]*dat$race[i] + beta_star_5[mc_sample]*dat$age[i] )))
+  for (mc_sample in 1:ncols){
+    tmp <- c(tmp,exp(beta_star_0[mc_sample] + beta_star_1[mc_sample]*dat$x.2[i] + beta_star_2[mc_sample]*dat$x.3[i] +beta_star_3[mc_sample]*dat$x.4[i] + beta_star_4[mc_sample]*dat$race[i] + beta_star_5[mc_sample]*dat$age[i] ))
   }
-  yrep_zinb[count,] <- tmp
+  log_lambda[count,] <- tmp
   count <- count +1
 }
 
-plot(test_index,rowMeans(yrep_zinb) - dat$y[test_index],ylab="y_hat_i - y_i",xlab="Test Index",main="Out of sample predictions")
 
+logit_pi <- matrix(NA,nrow = length(train_index),ncol=ncols)
+
+count <- 1
+for (i in train_index){
+  tmp <- c()
+  for (mc_sample in 1:ncols){
+    tmp <- c(tmp,inv.logit(alpha_star_0[mc_sample] + alpha_star_1[mc_sample]*dat$x.2[i] + alpha_star_2[mc_sample]*dat$x.3[i] +alpha_star_3[mc_sample]*dat$x.4[i] + alpha_star_4[mc_sample]*dat$race[i] + alpha_star_5[mc_sample]*dat$age[i] ))
+  }
+  logit_pi[count,] <- tmp
+  count <- count +1
+}
+
+
+yrep <- matrix(NA,nrow= length(train_index),ncol=ncols)
+
+for (i in 1:length(train_index)){
+  for (j in 1:ncols){
+    zero_part <- rbinom(1,1,logit_pi[i,j])
+    yrep[i,j] <- zero_part*rpois(1,log_lambda[i,j])
+  }
+}
+
+yrep_mean <- rowMeans(yrep)
+plot(yrep_mean - dat$y[train_index])
 
 ```
 
@@ -462,83 +501,24 @@ We can now examine the coverage probability. We do this by asking if the true ob
 
 ```{r}
 correct <- 0
-for (i in 1:nrow(yrep_zinb)){
+for (i in 1:nrow(yrep)){
   true_y <- dat$y[train_index[i]]
-  if (true_y >= quantile(yrep_zinb[i,],.025) && true_y <= quantile(yrep_zinb[i,],.975)){
+  if (true_y >= quantile(yrep[i,],.025) && true_y <= quantile(yrep[i,],.975)){
     correct <- correct + 1
   }
   
 }
 
 print ("Empirical coverage probability")
-print (correct/nrow(yrep_zinb))
-```
-
-Pretty low coverage probability but I'm not sure how to handle the fact that this is a discrete distribution. 
-
-
-### 3
-
-Lets examine what happens when we instead leave out observations not at random, but according to time. Suppose we leave out the first 20% of observations
-
-
-```{r}
-train_index <- 223:1113
-test_index <- 1:223
-
-
-forJags$getitrain.j <- train_index
-forJags$getitest.j <- test_index
-forJags$ntrain <- length(train_index)
-mod <- jags(data = forJags, 
-                    parameters.to.save=parnames, 
-                    n.chains = 3, n.burnin = 1500, n.iter =1500 + 5000, n.thin = 10, model.file = textConnection(model))
-```
-
-
-```{r}
-beta_star_j <- mod$BUGSoutput$sims.list$beta.j[,,1]
-
-beta_star_0 <- beta_star_j[,1]
-beta_star_1 <- beta_star_j[,2]
-beta_star_2 <- beta_star_j[,3]
-beta_star_3 <- beta_star_j[,4]
-
-beta_star_4 <- mod$BUGSoutput$sims.array[,,"beta4"]
-beta_star_5 <- mod$BUGSoutput$sims.array[,,"beta5"]
-
-
-yrep_zinb <- matrix(NA,nrow = length(test_index),ncol=100)
-count <- 1
-for (i in test_index){
-  tmp <- c()
-  for (mc_sample in 1:100){
-    tmp <- c(tmp,rpois(1,exp(beta_star_0[mc_sample] + beta_star_1[mc_sample]*dat$x.2[i] + beta_star_2[mc_sample]*dat$x.3[i] +beta_star_3[mc_sample]*dat$x.4[i] + beta_star_4[mc_sample]*dat$race[i] + beta_star_5[mc_sample]*dat$age[i] )))
-  }
-  yrep_zinb[count,] <- tmp
-  count <- count +1
-}
-
-plot(test_index,rowMeans(yrep_zinb) - dat$y[test_index],ylab="y_hat_i - y_i",xlab="Test Index",main="Out of sample predictions")
-
-
-correct <- 0
-for (i in 1:nrow(yrep_zinb)){
-  true_y <- dat$y[train_index[i]]
-  if (true_y >= quantile(yrep_zinb[i,],.025) && true_y <= quantile(yrep_zinb[i,],.975)){
-    correct <- correct + 1
-  }
-  
-}
-
-print ("Empirical coverage probability")
-print (correct/nrow(yrep_zinb))
+print (correct/nrow(yrep))
 ```
 
 
 
 ```{r}
-loglike1.model2<- mod2$BUGSoutput$sims.list$L
+library(loo)
+library(bayesplot)
+loglike1.model2<- mod$BUGSoutput$sims.list$L
 loo2 <- loo(loglike1.model2)
 print (loo2$elpd_loo)
 
@@ -547,8 +527,8 @@ print (loo2$elpd_loo)
 psis2 <- psislw(-loglike1.model2)
 lw2 <- psis2$lw_smooth
 ppc_loo_pit_overlay(
-  y = dat$y,
-  yrep = t(yrep.i_zinb),
+  y = dat$y[train_index],
+  yrep = t(yrep),
   lw = lw2
 )
 ```
