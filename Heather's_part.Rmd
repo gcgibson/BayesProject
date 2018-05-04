@@ -1,0 +1,183 @@
+---
+title: 'Heather''s Part '
+author: "Heather"
+date: "3/5/2018"
+output:
+  pdf_document: default
+  html_document: default
+  word_document: default
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE, fig.height = 3.5, fig.width = 5, fig.align = "center")
+library(readr)
+library(ggplot2)
+library(googledrive)
+library(rjags)
+library(R2jags)
+library(dplyr)
+
+PlotTrace <- function(parname, mcmc.array,n.chains= NULL, n.sim= NULL, main = NULL){
+  if (is.null(main)) main <- parname
+  if (is.null(n.sim)) n.sim <- dim(mcmc.array)[1]
+  if (is.null(n.chains)) n.chains <- dim(mcmc.array)[2]
+  plot(c(mcmc.array[,1,parname]), type = "l", ylab = main,  main = main,
+       ylim = c(min(mcmc.array[,,parname]),max(mcmc.array[,,parname])))
+  for (chain in 1:n.chains){
+    lines(c(mcmc.array[,chain,parname]), type = "l", col = chain)
+  }
+  for (chain in 1:n.chains){
+    curve(predict(loess(c(mcmc.array[,chain,parname])~seq(1,n.sim)),x), lty = 2, lwd = 3, add = TRUE, type = "l", col = chain)
+  }
+}
+
+allshootings <- read.csv("~/AllShootings_clean.csv")
+gun_regulations <- read.csv("~/gun_regulation.csv")
+```
+
+Soem exploratory/summary graphs:  
+
+```{r plots, echo=FALSE, warning = "hide"}
+dates <- allshootings$Date
+dates <- dates[2:length(dates)]
+
+allshootings$Date <- as.Date(allshootings$Date,format="%m/%d/%Y")
+allshootings$year <- format(allshootings$Date,"%Y")
+
+per_state <- matrix(nrow=53, ncol=2)
+state.i <- as.vector(allshootings$State)
+state.k <- unique(state.i)
+K <- length(state.k)
+number_per_state <- rep(NA, K)
+for (i in 1:length(summary(allshootings$State))){
+  per_state[i,2] <- summary(allshootings$State)[i]
+  per_state[i,1] <- sort(state.k)[i]
+}
+state <- as.data.frame(per_state)
+
+number <- rep(NA, length(allshootings$Victim.s..Deceased..at.school.))
+for (i in 1:length(allshootings$Victim.s..Deceased..at.school.)){
+  if (is.na(allshootings$Victim.s..Deceased..at.school.)[i]==TRUE){
+    number[i] <- 0
+  }
+    else{
+      number[i]<- allshootings$Victim.s..Deceased..at.school.[i]
+  }
+}
+
+allshootings$Victim.s..Deceased..at.school. <- number
+
+number2 <- rep(NA, length(allshootings$Victim.s..Deceased..at.school.))
+
+for (i in 1:length(allshootings$Victim.s..Deceased..off.campus.)){
+  if (is.na(allshootings$Victim.s..Deceased..off.campus.)[i]==TRUE){
+    number2[i] <- 0
+  }
+    else{
+      number2[i]<- allshootings$Victim.s..Deceased..off.campus.[i]
+  }
+}
+
+allshootings$Victim.s..Deceased..off.campus. <- number2
+
+allshootings$total_victims <- allshootings$Victim.s..Deceased..at.school. + allshootings$Victim.s..Deceased..off.campus.
+
+
+ggplot(gun_regulations, aes(x=gun_regulations$state,y = gun_regulations$lawtotal)) + geom_point()   + labs(title = "Total Number of Gun Regulations by State")
+
+ggplot(allshootings,aes(x=allshootings$Weapon.s..Categories,y = allshootings$total_victims)) + geom_point()   + labs(title = "Number of Victims by Gun Type", y="Number of Victims", x="Type of Gun")
+
+#Want to have differnt colors on the plot below for states with high gun regulations(>50) vs. states with low regulations. 
+ggplot(state,aes(x=state$V1,y = state$V2)) + geom_point()  + labs(title = "Number of Incidents by State", y="Number of Incidents", x="State")
+```
+Goal: Model gun type with gun regualtions to see if increased gun regulations play a role in type of gun used in school shootings. 
+
+Still to do:   
+ - Get code below to run for simple model and model with gun regulations.  
+ - Check that priors for all models are vague. (histograms of priors and posteriors)  
+ - Check for converenge issues (traceplots, Rhat and neff for all parameters)
+
+
+
+Simple model for gun type used: 
+
+$$ \text{ gun type } = G_{j} \sim Multinomial(N, p_1, ..., p_J) $$
+$$log(\frac {P(G_j = j|g.reg_i)}{P(G_j = J|g.reg_i)}) = \alpha_j   $$
+$$ j = 1, ..., J-1 $$
+$$ J \text{ is the reference gun type} $$
+
+```{r, eval=FALSE}
+group.i <- as.vector(allshootings$Weapon.s..Categories)
+n <- length(allshootings$Weapon.s..Categories)
+group.j <- unique(group.i)
+J <- length(group.j)
+weapongetj.i <- rep(NA, n)
+for (j in 1:J){
+  weapongetj.i[group.i==group.j[j]] <- j
+}
+
+model <- "
+model {
+weapon_type[1:J] ~ dmultinom(p[1:J],N)
+
+for (j in 1:J) {
+              p[j] <- delta[j] / sum(delta[j])
+              delta[j] ~ dgamma(alpha[j], 0.0001)
+}
+
+for (j in 1 : J) { 
+  alpha[j] ~ dunif(0.001, .8)
+  
+}
+
+} # end model
+"
+jags.data <- list(weapon_type = allshootings$Weapon.s..Categories, J=J,
+                  N=length(allshootings$Weapon.s..Categories))
+
+parnames <- c( "alpha")
+
+mod <- jags(data = jags.data, parameters.to.save=parnames, n.chains = 3, n.burnin = 1000, n.iter = 2500+1000, model.file = textConnection(model))
+```
+Using gun regulations to model gun type used: 
+
+$$ \text{ gun type } = G_{j} \sim Multinomial(N, p_1, ..., p_J) $$
+$$log(\frac {P(G_j = j|g.reg_i)}{P(G_j = J|g.reg_i)}) = \alpha_{j} + \beta_{j}*g.reg_{s,t[i]}  $$
+$$ where gun regulations is a binary variable, either high or low in state, s, at time, t.
+```{r, eval=FALSE}
+model <- "
+model {
+weapon_type[1:J] ~ dmultinom(p[1:J], N)
+
+for (j in 1:J) {
+              p[j] <- delta[j] / sum(delta[j])
+              delta[j] ~ dgamma(phi[j], 0.0001)
+}
+for (j in 1 : J) { 
+  phi[j] <- alpha[j] 	+ beta*gun_reg
+  
+}
+
+for (j in 1 : J) { 
+  alpha[j] ~ dunif(0.001, .8)
+  
+}
+
+  beta ~ rnorm(0, 0.0001)
+
+
+} # end model
+"
+jags.data <- list(weapon_type = allshootings$Weapon.s..Categories, J=J, 
+                  gun_reg = gun_regulations$lawtotal,
+                  n=length(allshootings$Weapon.s..Categories))
+
+parnames <- c( "alpha", "beta")
+
+mod <- jags(data = jags.data, parameters.to.save=parnames, 
+            n.chains = 3, n.burnin = 1000, n.iter = 2500, 
+            model.file = textConnection(model))
+```
+
+
+

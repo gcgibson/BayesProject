@@ -1,0 +1,174 @@
+---
+title: "Progress Report - Are school shootings becoming more frequent?"
+author: "Bianca Doone"
+date: "April 3, 2018"
+output: pdf_document
+---
+
+###Questions:
+Are the frequency of shootings really increasing?
+
+Whare are the projections for shootings in the next 5,10,50 years? How many shootings can we expect this year? Are we above average right now?
+
+###The data I'm working with:
++ 27 years of data, plus up to March 19th, 2018
++ Incidences of school shootings
++ Created a variable to show the amount of days between shootings
++ Combined data into year format (number of shootings per year, maximum number of days without a shooting, proportion of shootings per year)
+
+*Note*: I have done a lot of data cleaning/organizing/restructuring done from the original dataset.
+
+###Goal of My Analysis:
+The plan is to model the number shootings per year with a Poisson distribution, and a prior for lambda that is an AR(1) time series. Report results in proportions of shooting per year.
+
+Then I plan to forcast the year 2018 and compare it to the actual data we have now.
+
+###Current Problems:
++ I'm not sure if my proposed model is suitable for the type of data I'm working with (not particularly sure how to model rare-binary outcomes in a time-series)
++ I can't get my JAGS code to run, the code is shown below
++ I still haven't learned how to do in and out of sample validation to compare my forcast with the actual data
++ Is my proposed plan enough for my segment?
+
+\pagebreak
+
+#My Analysis
+
+```{r, echo=FALSE, warning = FALSE, message=FALSE}
+library(ggplot2)
+library(lubridate)
+library(R2jags)
+library(rjags)
+```
+
+```{r,  echo=FALSE}
+ss_final = read.csv("C:/Users/bdoone/Desktop/ss_final.csv", header = T)
+shootings2 = read.csv("C:/Users/bdoone/Desktop/shootings2.csv", header = T)
+year_df = read.csv("C:/Users/bdoone/Desktop/year_df.csv", header = T)
+```
+
+
+```{r, echo=FALSE}
+#create difference variable
+shootings2$daysfromlast <- rep(NA, length(shootings2$Days))
+shootings2$daysfromlast[1] = 0
+
+for(i in 2:length(shootings2$Days)){
+  shootings2$daysfromlast[i] = shootings2$Day[i] - shootings2$Days[i-1]
+}
+
+
+```
+
+
+#Summary Statistics (TOTAL)
+
+```{r}
+table(ss_final$Shooting)
+
+#add table year and number shootings/proportion
+```
+
+
+#Incidence of Shooting Over Time
+```{r}
+#basic histogram - number of shootings per year (with proportions table)
+ggplot(data=shootings2, aes(x = as.factor(Year), fill = as.factor(Year))) +
+  geom_bar()
+
+print(year_df$Prop.Shootings.Year)
+
+#basic graph - days from last shooting against shooting (with table maximums)
+ggplot(data = shootings2, aes(x = Days, y = daysfromlast)) + geom_line()
+
+print(year_df$Max.difference)
+```
+
+#My Model
+
+Shooting time-series model (by year):
+
+$$y_t \sim \mbox{Poisson}(\lambda_t) $$
+
+$$\lambda_t \sim \mbox{AR(1)} = \rho \lambda_{t-1} + \epsilon_t  $$
+where $y_t$ is the number of shootings in year $t$.
+
+
+##I couldn't get this to run :(
+```{r, eval=FALSE}
+GetAR <- function(nyears, # length of series
+                  rho, sigma, # AR parameters
+                  eps0.t = NULL, # innovations (optional)
+                  ystart = NULL # starting value y1 (optional)
+                  ){
+  if (is.null(eps0.t)){
+    set.seed(123)
+    eps0.t <- rnorm(nyears, 0, 1)
+  }
+  y.t <- rep(NA, nyears)
+  if (is.null(ystart)){
+    y.t[1] <- sigma/sqrt(1-rho^2)*eps0.t[1]
+  } else {
+    y.t[1] <- ystart
+  }
+  for (t in 2:nyears){
+    y.t[t] <- rho*y.t[t-1] + sigma*eps0.t[t]
+  }
+  return(y.t)
+}
+
+sigma <- 1
+rho <- 0.5
+nyears <- year_df$Year
+jags.data <- list(y.t = year_df$Shootings, nyears=year_df$Year)
+parnames <- c("sigma", "rho")
+set.seed(1)
+
+model <- "model{
+y.t[1] ~ dpois(lambda.t[1])
+lambda.t[1] ~ dnorm(0,tau.lambda)
+tau.lambda <- (1-rho^2)/sigma^2
+for (t in 2:nyears){
+ y.t[t] ~ dpois(lambda.t[t])
+ lambda.t[t] <- rho*y.t[t-1]
+}
+
+sigma ~ dunif(0,15)
+rho ~ dunif(-1,1)
+}"
+P = 1
+
+mod <-jags(data = jags.data, 
+                    parameters.to.save= c("y.t", parnames),
+           model.file = textConnection(model))
+max(mod$BUGSoutput$summary[, c("Rhat")])
+min(mod$BUGSoutput$summary[, c("n.eff")])
+round(mod$BUGSoutput$summary[c("sigma",  "rho", "lambda.t"),],2)
+
+ypred.sp <- mod$BUGSoutput$sims.list[["y.p"]]
+ypred.qp <- apply(ypred.sp, 2, quantile, c(0.025, 0.5, 0.975))
+```
+
+
+
+
+#Comparing Pre- and Post-2018 (Using either in or out of sample validation)
+```{r}
+
+```
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
