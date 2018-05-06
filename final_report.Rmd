@@ -115,7 +115,22 @@ allshootings <- read.csv("/Users/gcgibson/BayesProject/AllShootings_clean_final.
 
 #gunRegulations <- read.csv("/Users/gcgibson/BayesProject/Gu")
 
-ames.data <- allshootings$Victim.s..Injured..at.school.
+
+
+v_i_a_s <- as.numeric(allshootings$Victim.s..Injured..at.school.)
+v_i_a_s[is.na(v_i_a_s)] <- 0
+
+v_i_d_s <- as.numeric(allshootings$Victim.s..Deceased..at.school.)
+v_i_d_s[is.na(v_i_d_s)] <- 0
+
+v_i_d_o <- as.numeric(allshootings$Victim.s..Deceased..off.campus.)
+v_i_d_o[is.na(v_i_d_o)] <- 0
+
+v_i_i_o <- as.numeric(allshootings$Victim.s..Injured..off.campus.)
+v_i_i_o[is.na(v_i_i_o)] <- 0
+
+ames.data <- v_i_i_o + v_i_d_o + v_i_d_s +v_i_a_s
+
 
 number_of_victims <-c()
 s <- c()
@@ -407,7 +422,7 @@ mod <- jags(data = forJags,
 mcmc.array <- mod$BUGSoutput$sims.array
 
 library(shinystan)
-my_sso <- launch_shinystan(as.shinystan(mod$BUGSoutput$sims.array))
+#my_sso <- launch_shinystan(as.shinystan(mod$BUGSoutput$sims.array))
 
 ```
 
@@ -577,37 +592,122 @@ ppc_loo_pit_overlay(
 )
 ```
 
-```{r}
-library(onehot)
-wc <- data.frame(allshootings$Weapon.s..Categories)
-encoder <- onehot(wc, addNA=TRUE)
-x <- predict(encoder,wc)
-x[is.na(x)] <-0
+
+
+
+
+```{r creating data sets, results = 'hide'}
+library(pander)
+totals <- read.csv("/Users/gcgibson/Downloads/gun_regulation_totals.csv")
+weapon <- as.vector(allshootings$Weapon.s..Categories)
+handgun<- as.data.frame(allshootings$State)
+r <- matrix(nrow=1113, ncol=2)
+state.j <- as.vector(allshootings$State)
+for (i in 1:length(state.j)){
+  r[i,1] <- state.j[i]
+  for (j in 1:length(totals$State)){
+    if (totals$State[j]==r[i]){
+        if (totals$State[j]==r[i])
+      r[i,2] <- totals$lawtotal[j]
+    }
+  }
+}
+gun_regualtions_vec <- as.numeric(r[,2])
+weapon_data1 <- matrix(NA, nrow=1113, ncol=3)
+weapon <- as.vector(allshootings$Weapon.s..Categories)
+for (i in 1:length(allshootings$Weapon.s..Categories)){
+  if (allshootings$Weapon.s..Categories[i]=="Handgun"){
+    weapon_data1[i,1] <- 1
+    weapon_data1[i,2] <- 0
+    weapon_data1[i,3] <- gun_regualtions_vec[i]
+  }
+  if (allshootings$Weapon.s..Categories[i]=="Rifle"){
+    weapon_data1[i,1] <- 0
+    weapon_data1[i,2] <- 1
+    weapon_data1[i,3] <- gun_regualtions_vec[i]
+  }
+}
+weapon_data1 <- weapon_data1[complete.cases(weapon_data1), ]
+weapon_data2 <- matrix(NA, nrow=1113, ncol=3)
+weapon <- as.vector(allshootings$Weapon.s..Categories)
+for (i in 1:length(allshootings$Weapon.s..Categories)){
+  if (allshootings$Weapon.s..Categories[i]=="Handgun"){
+    weapon_data2[i,1] <- 1
+    weapon_data2[i,2] <- 0
+    weapon_data2[i,3] <- gun_regualtions_vec[i]
+  }
+  if (allshootings$Weapon.s..Categories[i]=="Shotgun"){
+    weapon_data2[i,1] <- 0
+    weapon_data2[i,2] <- 1
+    weapon_data2[i,3] <- gun_regualtions_vec[i]
+  }
+}
+weapon_data2 <- weapon_data2[complete.cases(weapon_data2), ]
+```
+
+
+```{r logistic model: handgun vs rifle}
 model <- "
 model  {
   for (i in 1:n){
-    weapon_type[i,1:J] ~ dmulti(p[1:J], 1)
-   
+    rifle[i] ~ dbern(p[i])
+    logit(p[i]) <- beta0 + beta1*(gun_regualtions_vec[i] - mean_gr1)
+    loglike.i[i] <- logdensity.bern(rifle[i], p[i])
   }
-  for (j in 1:J){
-      logit_p[j] <- beta0 + beta1*gun_reg
-      p[j] <- exp(logit_p[j])/(1+exp(logit_p[j]))
-  }
-  
-  beta0 ~ dnorm(0,.01)
-  beta1 ~ dnorm(0,.01)
+  beta0 ~ dnorm(0,0.001)
+  beta1 ~ dnorm(0,0.001)
 } # end model
 "
-J <- 10
-fake_data <- matrix(NA, nrow = 1000, ncol=J)
-
-for (i in 1:1000){
-  fake_data[i,] <-t(rmultinom(1,10,rep(1/J,J)))
-}
-#x <- x + 50
-jag.data <- list(weapon_type = x,gun_reg=10, J=J, n=nrow(x), ones = rep(1,J))
-
-parname <- c("p")
-
-mod <- jags(data = jag.data, parameters.to.save=parname, n.chains = 3, n.burnin = 1000, n.iter = 2500+1000, model.file = textConnection(model))
+jag.data <- list(rifle = weapon_data1[,2], n=length(weapon_data1[,2]), gun_regualtions_vec=as.numeric(weapon_data1[,3]), mean_gr1 = mean(as.numeric(weapon_data1[,3])))
+parname <- c("beta0", "beta1", "loglike.i")
+mod_rifle <- jags(data = jag.data, parameters.to.save=parname, n.chains = 3, n.burnin = 1000, n.iter = 2500+1000, model.file = textConnection(model))
 ```
+
+
+
+```{r handgun/rifle model output}
+require(devtools)
+require(jagstools)
+jags.output <- jagsresults(x=mod_rifle, params=c("beta1"))
+jags.rhat_ss <- jags.output[c("beta1"), c('mean', '2.5%', '97.5%', 'Rhat', 'n.eff')]
+pander(jags.rhat_ss, caption = "Beta for Rifle vs Handgun")
+```
+
+
+```{r logistic model: handgun vs shotgun}
+model <- "
+model  {
+  for (i in 1:n){
+    shotgun[i] ~ dbern(p[i])
+    logit(p[i]) <- beta0 + beta1*(gun_regualtions_vec[i] - mean_gr2) 
+    loglike.i[i] <- logdensity.bern(shotgun[i], p[i])
+  }
+  beta0 ~ dnorm(0,0.001)
+  beta1 ~ dnorm(0,0.001)
+} # end model
+"
+jag.data <- list(shotgun = weapon_data2[,2], n=length(weapon_data2[,2]), gun_regualtions_vec=as.numeric(weapon_data2[,3]), mean_gr2 = mean(as.numeric(weapon_data2[,3])))
+parname <- c("beta0", "beta1", "loglike.i")
+mod_shotgun <- jags(data = jag.data, parameters.to.save=parname, n.chains = 3, n.burnin = 1000, n.iter = 2500+1000, model.file = textConnection(model))
+```
+
+
+
+```{r handgun/shotgun model output}
+require(devtools)
+require(jagstools)
+
+jags.output <- jagsresults(x=mod_shotgun, params=c("beta1"))
+jags.rhat_ss <- jags.output[c("beta1"), c('mean', '2.5%', '97.5%', 'Rhat', 'n.eff')]
+pander(jags.rhat_ss, caption = "Beta for Shotgun vs Handgun")
+```
+
+
+
+
+
+
+
+
+
+
