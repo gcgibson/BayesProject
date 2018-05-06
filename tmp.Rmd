@@ -430,8 +430,8 @@ We can see from the $95\%$ quantiles of the fitting that region $3,4,6$ have a p
 
 ```{r, echo=FALSE,message=FALSE}
 ### TRAIN/TEST RUN
-train_index <- sample(1:1113,780)
-test_index <- setdiff(1:1113,train_index)
+#train_index <- sample(1:1113,780)
+#test_index <- setdiff(1:1113,train_index)
 
 
 forJags$getitrain.j <- train_index
@@ -528,12 +528,12 @@ yrep_mean <- rowMeans(yrep)
 plot(yrep_mean - dat$y[train_index])
 
 #out of  sample
-yrep_test <- generate_yrep_from_mcmc(mod,400,dat[test_index,])
-yrep_mean_test <- rowMeans(yrep_test)
-plot(yrep_mean_test[1:20],lty=1,type="l",col="blue",ylim=c(0,30),main="Out of sample predictions on the test set",ylab="yhat | y_train - y_true ")
-lines(dat$y[test_index][1:20])
-legend("topleft", legend=c("yhat", "ytrue"),
-       col=c("blue", "black"), lty=1:2, cex=0.8)
+#yrep_test <- generate_yrep_from_mcmc(mod,400,dat[test_index,])
+#yrep_mean_test <- rowMeans(yrep_test)
+#plot(yrep_mean_test[1:20],lty=1,type="l",col="blue",ylim=c(0,30),main="Out of sample predictions on the test set",ylab="yhat | y_train - y_true ")
+#lines(dat$y[test_index][1:20])
+#legend("topleft", legend=c("yhat", "ytrue"),
+ #      col=c("blue", "black"), lty=1:2, cex=0.8)
 
 ```
 
