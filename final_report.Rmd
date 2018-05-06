@@ -651,16 +651,39 @@ model <- "
 model  {
   for (i in 1:n){
     rifle[i] ~ dbern(p[i])
-    logit(p[i]) <- beta0 + beta1*(gun_regualtions_vec[i] - mean_gr1)
+    logit(p[i]) <- alphabeta[region[i],1] + alphabeta[region[i],2]*(gun_regualtions_vec[i] - mean_gr1)
     loglike.i[i] <- logdensity.bern(rifle[i], p[i])
   }
-  beta0 ~ dnorm(0,0.001)
-  beta1 ~ dnorm(0,0.001)
+      
+  for (j in 1:J){
+     alphabeta[j,1:2] ~ dmnorm(mu_vec,InvSigma)
+  }
+   Sigma[1,1] <- pow(sigma.alpha,2)
+                    Sigma[2,2] <- pow(sigma.beta,2)
+      Sigma[1,2] <- rho.alphabeta*sigma.beta*sigma.alpha
+      Sigma[2,1] <- Sigma[1,2]
+      InvSigma[1:2, 1:2] <- inverse(Sigma[, ])
+      
+      # priors for cov matrix
+      rho.alphabeta ~ dunif(-1,1)
+      sigma.alpha ~ dunif(0,50)
+      sigma.beta ~ dunif(0,20)
+      
+      mu_vec[1] <- mu.alpha
+      mu_vec[2] <- mu.beta
+      mu.alpha ~ dnorm(0,mu.alpha.prec)
+      mu.beta ~dnorm(0,mu.beta.prec)
+      
+      mu.alpha.prec <- pow(mu.alpha.var,-2)
+      mu.alpha.var <- 100
+      
+      mu.beta.prec <- pow(mu.beta.var,-2)
+      mu.beta.var <- 100
 } # end model
 "
-jag.data <- list(rifle = weapon_data1[,2], n=length(weapon_data1[,2]), gun_regualtions_vec=as.numeric(weapon_data1[,3]), mean_gr1 = mean(as.numeric(weapon_data1[,3])))
-parname <- c("beta0", "beta1", "loglike.i")
-mod_rifle <- jags(data = jag.data, parameters.to.save=parname, n.chains = 3, n.burnin = 1000, n.iter = 2500+1000, model.file = textConnection(model))
+jag.data <- list(rifle = weapon_data1[,2], n=length(weapon_data1[,2]), gun_regualtions_vec=as.numeric(weapon_data1[,3]), mean_gr1 = mean(as.numeric(weapon_data1[,3])),region=dat$region,J=J)
+parname <- c("alphabeta", "loglike.i")
+mod_rifle <- jags(data = jag.data, parameters.to.save=parname, n.chains = 3, n.burnin = 1000, n.iter = 4000+1000, model.file = textConnection(model))
 ```
 
 
@@ -668,7 +691,7 @@ mod_rifle <- jags(data = jag.data, parameters.to.save=parname, n.chains = 3, n.b
 ```{r handgun/rifle model output}
 require(devtools)
 require(jagstools)
-jags.output <- jagsresults(x=mod_rifle, params=c("beta1"))
+jags.output <- jagsresults(x=mod_rifle, params=c("alphabeta"))
 jags.rhat_ss <- jags.output[c("beta1"), c('mean', '2.5%', '97.5%', 'Rhat', 'n.eff')]
 pander(jags.rhat_ss, caption = "Beta for Rifle vs Handgun")
 ```
