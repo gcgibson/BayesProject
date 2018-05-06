@@ -1,0 +1,844 @@
+---
+title: "Final Report"
+author: "Heather Weaver, Bianca Doone, Casey Gibson"
+date: "4/21/2018"
+output:
+  pdf_document: default
+  html_document: default
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+knitr::opts_chunk$set(cache=FALSE)
+
+```
+## Introduction
+
+School shootings have become much more prominent in the media in recent years, which has encouraged a push for more gun regulation and gun control. We have heard arguments on both sides of the assault rifle legislation issue. Our plan for this project is to take a statistical approach the question: Are assault rifles associated with a higher number of victims in a school shooting?
+
+## Data
+Our data was obtained through an independent source, Eric Laurine. This data set contains detailed information about shootings dating back to 1840. For our analysis, we chose to focus on data beginning in 1991, since we could potentially also take into account gun regulation data. Our final data set had 1113 observations and 8 clusters.
+
+![School Shootings](/Users/gcgibson/BayesProject/shootingcountperyear.png){width=50%}
+![School Shootings](/Users/gcgibson/BayesProject/Region_ID.png){width=50%}
+
+## Model Description
+$$Pr(y_i = j ) = \begin{cases}
+\pi_i   & j=0 \\
+(1-\pi_i)g(y_i ) & j >0 
+\end{cases}$$
+
+
+$$g \sim Poisson(\lambda_i)$$
+
+where 
+$$\mbox{logit}(\pi_{i}) = \alpha_{0j[i]} + \alpha_{1j[i]}x_{1} +\alpha_{2j[i]}x_{2} + \alpha_{3j[i]}x_{3} + \alpha_{4}(r_i-\bar{r}) + \alpha_5(a_i - \bar{a})$$
+$$\log (\lambda_{i}) = \beta_{0j[i]} + \beta_{1j[i]}x_{1} +\beta_{2j[i]}x_{2} + \beta_{3j[i]}x_{3} + \beta_{4}(r_i-\bar{r}) + \beta_5(a_i - \bar{a})$$
+
+
+
+$$\begin{pmatrix}
+\beta_{0j[i]} \\
+\beta_{1j[i]} \\
+\beta_{2j[i]} \\ 
+\beta_{4j[i]}
+\end{pmatrix} \sim N\begin{bmatrix} \begin{pmatrix}
+\mu_{\beta} \\
+\mu_{\beta} \\
+\mu_{\beta}  \\
+\mu_{\beta} 
+\end{pmatrix} ,\Sigma
+\end{bmatrix}
+$$
+
+$$\begin{pmatrix}
+\alpha_{0j[i]} \\
+\alpha_{1j[i]} \\
+\alpha_{2j[i]} \\ 
+\alpha_{4j[i]}
+\end{pmatrix} \sim N\begin{bmatrix} \begin{pmatrix}
+\mu_{\alpha} \\
+\mu_{\alpha} \\
+\mu_{\alpha}  \\
+\mu_{\alpha} 
+\end{pmatrix} ,\Gamma
+\end{bmatrix}
+$$
+
+$$\Sigma \sim \mbox{invWishart}(R,100)$$
+$$\Gamma \sim \mbox{invWishart}(R, 100)$$
+
+$$\mu_{\beta} \sim N(0,100)$$
+$$\mu_{\alpha} \sim N(0,100)$$
+
+We use a hurdle hierarchical model, where $y_i$ is the number of victims in a shooting $i$. $\pi_i$ is the probability of no victims in a shooting $i$. $g$ is the Poisson density that is factored into this probability if there are victims. $\mbox{logit}(\pi_i)$ is the log odds that a shooting had at least one victim, and is modeled using a logistic regression with gun type, $x_i$, centered race, $r_i$, and centered age, $a_i$. $\log (\lambda_i)$ is the log-expected number of victims given that there was at least one victim, and is model using a poisson regression with the same variables mentioned previously. The $\alpha$'s and $\beta$'s are given a multivariate normal distribution. $\mu_{\alpha}$ and $\mu_{\beta}$ are given vague normal priors, and the variance-covariance matricies, $\Gamma$ and $\Sigma$, are given a vague inverse Wishart prior distribution.
+
+We chose to use a hurdle model because in order to see if weapon type has an effect on the number of casualties, we need to have at least one casualty at each incidence of shooting. The hurdle model allows us to account for the incidences when there were no casualties. We also centered the race and age variables to reduce correlation. We created $j=9$ regions (clusters) using the state information (including 1 for NA). 
+
+
+## JAGS MODEL 
+
+
+```{r,message=FALSE,echo=FALSE,warning=FALSE,out.width = "50%"}
+library(readr)
+library(ggplot2)
+library(rjags)
+library(R2jags)
+
+
+#setwd("/Users/gcgibson/BayesProject/")
+
+shootingsafter <- read.csv("/Users/gcgibson/BayesProject/ShootingsAfter1991.csv")
+moreshootings <- read.csv("/Users/gcgibson/BayesProject/Shootings2016.csv")
+
+
+allshootings <- read.csv("/Users/gcgibson/BayesProject/AllShootings_clean_final.csv")
+
+#gunRegulations <- read.csv("/Users/gcgibson/BayesProject/Gu")
+
+
+
+v_i_a_s <- as.numeric(as.character(allshootings$Victim.s..Injured..at.school.))
+v_i_a_s[is.na(v_i_a_s)] <- 0
+
+v_i_d_s <- as.numeric(as.character(allshootings$Victim.s..Deceased..at.school.))
+v_i_d_s[is.na(v_i_d_s)] <- 0
+
+v_i_d_o <- as.numeric(allshootings$Victim.s..Deceased..off.campus.)
+v_i_d_o[is.na(v_i_d_o)] <- 0
+
+v_i_i_o <- as.numeric(allshootings$Victim.s..Injured..off.campus.)
+v_i_i_o[is.na(v_i_i_o)] <- 0
+
+ames.data <-  v_i_d_s +v_i_a_s
+
+
+number_of_victims <-c()
+s <- c()
+for (i in 1:length(ames.data)){
+  if (is.na(ames.data[i])){
+    #print ("hello")
+    number_of_victims <- c(number_of_victims,0)
+  } else if (ames.data[i] == "None"){
+    number_of_victims <- c(number_of_victims,0)
+  } else{
+    number_of_victims <- c(number_of_victims,ames.data[i])
+  }
+}
+
+allshootings$number_of_victims <- number_of_victims
+
+#plot(1:length(number_of_victims),number_of_victims,ylab="Number #of Victims",xlab="Shooting ID ordered by time")
+p <- ggplot(allshootings, aes(x=seq(1,1113),y = ames.data)) +  geom_point() + labs(title = "Number of Victims in each shooting incident from 1990-2016", y="Number of Victims", x="1990-2016") + scale_x_discrete(breaks = c(1,500,1100), labels=c("1990","2002","2016")) +theme(axis.text.x = element_text(angle = 90, hjust = 1))
+print(p)
+
+type_of_gun <- matrix(0,nrow=length(number_of_victims),ncol=4)
+tmp <- allshootings$Weapon.s..Categories
+
+for (i in 1:length(tmp)){
+  if (tmp[i] == "Handgun"){
+    type_of_gun[i,1] =  1
+  } else if (tmp[i] == "Rifle"){
+    type_of_gun[i,2] =  1
+  }  else if (tmp[i] == "Shotgun"){
+    type_of_gun[i,3] =  1
+  }  else {
+    type_of_gun[i,4] =  1
+  }
+}
+
+race <- allshootings$Shooter.s..or.Attacker.s..Race
+race_clean <- c()
+for (i in 1:length(race)){
+  if (race[i] == "African American"){
+    race_clean <- c(race_clean,0)
+  } else if (race[i] == "Caucasian"){
+    race_clean <- c(race_clean,1)
+  }  else if (race[i] == "Hispanic"){
+    race_clean <- c(race_clean,2)
+  }   else{
+    race_clean <- c(race_clean,4)
+  }
+}
+age <- allshootings$Shooter.s..or.Attacker.s..Age
+age_clean <- c()
+for (i in 1:length(age)){
+  if ( 0 < as.numeric(age[i]) & as.numeric(age[i]) <10 ){
+    age_clean <- c(age_clean,0)
+  } else if (10 < as.numeric(age[i]) & as.numeric(age[i]) < 20){
+    age_clean <- c(age_clean,1)
+  }   else{
+    age_clean <- c(age_clean,2)
+  }
+}
+
+dat <- data.frame(x=type_of_gun,y=number_of_victims,race=race_clean -mean(race_clean),age=age_clean-mean(age_clean))
+
+ones_ <- c()
+for (y in dat$y){
+  if (y == 0){
+    ones_ <- c(ones_,0)
+  }
+  else{
+    ones_<-c(ones_,1)
+  }
+}
+
+y_fact <- c()
+for (y in dat$y){
+  
+    y_fact <- c(y_fact,factorial(y))
+ 
+}
+
+
+
+allshootings$region[  allshootings$State == "ME"| 
+                allshootings$State == "MA"| 
+                allshootings$State == "NH"| 
+                allshootings$State == "RI"| 
+                allshootings$State == "VT" ] <- 5
+
+allshootings$region[allshootings$State == "CT" | 
+                allshootings$State == "NJ"| 
+                allshootings$State == "NY"| 
+                allshootings$State == "PA"|
+                  allshootings$State == "WV"] <- 1
+
+allshootings$region[allshootings$State == "IL" | 
+                allshootings$State == "IN"| 
+                allshootings$State == "MI"| 
+                allshootings$State == "OH"| 
+                allshootings$State == "WI"] <-6 
+                  
+allshootings$region[allshootings$State == "MN"| 
+                allshootings$State == "MO"| 
+                allshootings$State == "NE"| 
+                allshootings$State == "ND"| 
+                allshootings$State == "SD"|
+                 allshootings$State == "KS"|
+                  allshootings$State == "IA"] <- 2
+
+allshootings$region[allshootings$State == "DE" | 
+                allshootings$State == "GA"| 
+                allshootings$State == "MD"| 
+                allshootings$State == "NC"| 
+                allshootings$State == "SC"| 
+                allshootings$State == "VA"| 
+                allshootings$State == "FL"| 
+                allshootings$State == "Wash D.C" ] <- 7
+
+allshootings$region[allshootings$State == "AL"| 
+                allshootings$State == "KY"| 
+                allshootings$State == "MS"| 
+                allshootings$State == "TN"| 
+                allshootings$State == "AR"| 
+                allshootings$State == "LA"| 
+                allshootings$State == "OK"| 
+                allshootings$State == "TX"] <- 3
+
+allshootings$region[allshootings$State == "AZ" | 
+                allshootings$State == "CO"| 
+                allshootings$State == "ID"| 
+                allshootings$State == "MT"| 
+                allshootings$State == "NV"| 
+                allshootings$State == "NM"| 
+                allshootings$State == "UT" |
+                  allshootings$State == "WY"] <- 8 
+
+
+allshootings$region[allshootings$State == "AK"| 
+                allshootings$State == "CA"| 
+                allshootings$State == "HI"| 
+                allshootings$State == "OR"| 
+                allshootings$State == "WA"] <- 4
+
+
+gun_reg <- read.csv("/Users/gcgibson/BayesProject/Gun_Reg.csv")
+
+region_1_gun_reg <- sum(gun_reg[gun_reg$State == "Connecticut",][1,3:ncol(gun_reg)])+ sum(gun_reg[gun_reg$State == "New Jersey",][1,3:ncol(gun_reg)])+ sum(gun_reg[gun_reg$State == "New York",][1,3:ncol(gun_reg)])+ sum(gun_reg[gun_reg$State == "Pennsylvania",][1,3:ncol(gun_reg)])+ sum(gun_reg[gun_reg$State == "West Virginia",][1,3:ncol(gun_reg)])
+
+
+
+
+region_2_gun_reg <- sum(gun_reg[gun_reg$State == "Minnesota",][1,3:ncol(gun_reg)]) +sum(gun_reg[gun_reg$State == "Nebraska",][1,3:ncol(gun_reg)]) +sum(gun_reg[gun_reg$State == "Missouri",][1,3:ncol(gun_reg)]) +sum(gun_reg[gun_reg$State == "North Dakota",][1,3:ncol(gun_reg)]) +sum(gun_reg[gun_reg$State == "South Dakota",][1,3:ncol(gun_reg)]) +sum(gun_reg[gun_reg$State == "Kansas",][1,3:ncol(gun_reg)]) +sum(gun_reg[gun_reg$State == "Iowa",][1,3:ncol(gun_reg)])
+
+
+
+
+region_3_gun_reg <- sum(gun_reg[gun_reg$State == "Alabama",][1,3:ncol(gun_reg)]) +sum(gun_reg[gun_reg$State == "Kentucky",][1,3:ncol(gun_reg)]) +sum(gun_reg[gun_reg$State == "Mississippi",][1,3:ncol(gun_reg)]) +sum(gun_reg[gun_reg$State == "Tennessee",][1,3:ncol(gun_reg)])+sum(gun_reg[gun_reg$State == "Arkansas",][1,3:ncol(gun_reg)])+sum(gun_reg[gun_reg$State == "Louisiana",][1,3:ncol(gun_reg)])+sum(gun_reg[gun_reg$State == "Oklahoma",][1,3:ncol(gun_reg)])+sum(gun_reg[gun_reg$State == "Texas",][1,3:ncol(gun_reg)])
+
+
+
+
+
+
+ region_4_gun_reg <- sum(gun_reg[gun_reg$State == "Alaska",][1,3:ncol(gun_reg)]) + sum(gun_reg[gun_reg$State == "California",][1,3:ncol(gun_reg)])+ sum(gun_reg[gun_reg$State == "Hawaii",][1,3:ncol(gun_reg)])+ sum(gun_reg[gun_reg$State == "Oregon",][1,3:ncol(gun_reg)])+ sum(gun_reg[gun_reg$State == "Washington",][1,3:ncol(gun_reg)])
+
+
+
+
+region_5_gun_reg <- sum(gun_reg[gun_reg$State == "Maine",][1,3:ncol(gun_reg)]) + sum(gun_reg[gun_reg$State == "Massachusetts",][1,3:ncol(gun_reg)]) + sum(gun_reg[gun_reg$State == "New Hampshire",][1,3:ncol(gun_reg)])+ sum(gun_reg[gun_reg$State == "Rhode Island",][1,3:ncol(gun_reg)])+ sum(gun_reg[gun_reg$State == "Vermont",][1,3:ncol(gun_reg)])
+
+
+
+region_6_gun_reg <- sum(gun_reg[gun_reg$State == "Illonois",][1,3:ncol(gun_reg)]) + sum(gun_reg[gun_reg$State == "Michigan",][1,3:ncol(gun_reg)]) + sum(gun_reg[gun_reg$State == "Ohio",][1,3:ncol(gun_reg)]) + sum(gun_reg[gun_reg$State == "Wisconsin",][1,3:ncol(gun_reg)]) + sum(gun_reg[gun_reg$State == "Indiana",][1,3:ncol(gun_reg)]) 
+
+
+
+
+region_7_gun_reg <-  sum(gun_reg[gun_reg$State == "Delaware",][1,3:ncol(gun_reg)]) +sum(gun_reg[gun_reg$State == "Florida",][1,3:ncol(gun_reg)]) +sum(gun_reg[gun_reg$State == "Georgia",][1,3:ncol(gun_reg)]) +sum(gun_reg[gun_reg$State == "Maryland",][1,3:ncol(gun_reg)]) +sum(gun_reg[gun_reg$State == "North Carolina",][1,3:ncol(gun_reg)])+sum(gun_reg[gun_reg$State == "South Carolina",][1,3:ncol(gun_reg)]) +sum(gun_reg[gun_reg$State == "Virginia",][1,3:ncol(gun_reg)]) +sum(gun_reg[gun_reg$State == "Wash D.C",][1,3:ncol(gun_reg)]) 
+
+
+
+region_8_gun_reg <-  sum(gun_reg[gun_reg$State == "Arizona",][1,3:ncol(gun_reg)]) +sum(gun_reg[gun_reg$State == "Colorado",][1,3:ncol(gun_reg)]) +sum(gun_reg[gun_reg$State == "Idaho",][1,3:ncol(gun_reg)]) +sum(gun_reg[gun_reg$State == "Montana",][1,3:ncol(gun_reg)]) +sum(gun_reg[gun_reg$State == "New Mexico",][1,3:ncol(gun_reg)])+sum(gun_reg[gun_reg$State == "Utah",][1,3:ncol(gun_reg)]) +sum(gun_reg[gun_reg$State == "Nevada",][1,3:ncol(gun_reg)]) +sum(gun_reg[gun_reg$State == "Wyoming",][1,3:ncol(gun_reg)]) 
+
+
+gun_reg_vec <- c(region_1_gun_reg,region_2_gun_reg,region_3_gun_reg,region_4_gun_reg,region_5_gun_reg,region_5_gun_reg,region_7_gun_reg,region_8_gun_reg,0)
+
+
+model <- "model{
+
+    # reference for C and zero trick http://www.medicine.mcgill.ca/epidemiology/Joseph/courses/common/Tricks.html
+    C <- 10000 
+
+    for(j in 1:ntrain){
+      LikCountModel[j] <- pow(mu[j],y[getitrain.j[j]])/y_fact[getitrain.j[j]]*exp(-mu[j])
+      
+    # beta part
+      eta[j] <- beta.j[1,region[j]] + beta.j[2,region[j]]*x2[getitrain.j[j]] + beta.j[3,region[j]]*x3[getitrain.j[j]]   +   beta.j[4,region[j]]*x4[getitrain.j[j]] + beta4*race[getitrain.j[j]] + beta5*age[getitrain.j[j]]
+      
+      mu[j] <- exp(eta[j])
+      #alpha part
+     zeta[j] <- alpha.j[1,region[j]] + alpha.j[2,region[j]]*x2[getitrain.j[j]] + alpha.j[3,region[j]]*x3[getitrain.j[j]]   +   alpha.j[4,region[j]]*x4[getitrain.j[j]] + alpha4*race[getitrain.j[j]] + alpha5*age[getitrain.j[j]]
+      w[j] <- exp(zeta[j])/(1+exp(zeta[j]))
+      
+      #1/0 Tricks: ones is a column containing only ones, with the same size of y
+      p[j] <- L[j] / C
+      ones[j] ~ dbern(p[j])
+
+
+      indicator[j] <- ifelse(y[j] > 0, 1, 0)
+
+      #Full likelihood expression
+      L[j] <- indicator[j]*LikCountModel[j] * (1-w[j]) + equals(y[j],0)*w[j]
+      
+    } 
+  
+    for (j in 1:4){
+      mu_beta_vec[j] <- mu_beta 
+    }
+
+    for (j in 1:4){
+      mu_alpha_vec[j] <- mu_alpha 
+    }
+    
+    for (j in 1:J){
+       beta.j[1:4,j] ~ dmnorm( mu_beta_vec, V)
+     
+    }
+  
+     for (j in 1:J){
+       alpha.j[1:4,j] ~ dmnorm( mu_alpha_vec, W)
+     }
+  
+    V ~ dwish(R, 4)
+    W ~ dwish(R, 4)
+    sigma ~ dunif(0,20)
+    alpha4 ~ dnorm(mu.alpha,tau.alpha)
+    alpha5 ~ dnorm(mu.alpha,tau.alpha)
+    beta4 ~ dnorm(mu.beta,tau.beta) 
+    beta5 ~ dnorm(mu.beta,tau.beta) 
+    mu_beta ~ dnorm(0,.01)
+    mu_alpha ~ dnorm(0,.01)
+    
+    r ~ dunif(0,50)
+}"
+
+
+
+dat$region <- allshootings$region
+
+dat$region[is.na(dat$region)] <- 9
+J <- length(unique(dat$region))
+forJags <- list(
+                x2=dat$x.2,
+                x3=dat$x.3,
+                x4 = dat$x.4,
+                race = dat$race ,
+                age = dat$age,
+                y=dat$y,
+                ones = ones_,# DV
+                y_fact = y_fact,
+                R = diag(c(1,1,1,1)),
+                gun_reg_vec = gun_reg_vec,
+                prec_vec = solve(diag(4)),
+                region = dat$region,
+                J = 9,
+                mu.beta=0,  # priors centered on 0
+                tau.beta=.1,
+                mu.alpha=0,  # priors centered on 0
+                tau.alpha=.1
+                )  # diffuse priors
+
+
+parnames <- c( "beta.j","mu","beta4","beta5","alpha.j","alpha4","alpha5","L")
+
+
+
+### FULL RUN
+train_index <- 1:1113#sample(1:1113,780)
+test_index <- setdiff(1:1113,train_index)
+
+
+forJags$getitrain.j <- train_index
+forJags$getitest.j <- test_index
+forJags$ntrain <- length(train_index)
+
+
+
+mod <- jags(data = forJags, 
+                    parameters.to.save=parnames, 
+                    n.chains = 4, n.burnin = 1500, n.iter =1500 + 1000, n.thin = 10, model.file = textConnection(model))
+
+mcmc.array <- mod$BUGSoutput$sims.array
+```
+
+```{r}
+#library(shinystan)
+#my_sso <- launch_shinystan(as.shinystan(mod$BUGSoutput$sims.array))
+
+```
+
+
+## Inference
+
+```{r,echo=FALSE}
+print ("Regional effect of rifle ")
+for (j in 1:8){
+  print (quantile(mod$BUGSoutput$sims.list$beta.j[,2,j],c(.025,.975)))
+}
+
+```
+
+We can see from the $95\%$ quantiles of the fitting that region $3,4,6$ have a positive effect of Rifle on umber of victims, and the remaining regions have no effect. 
+
+
+## Diagnostics
+![School Shootings](/Users/gcgibson/BayesProject/traceplot.png){width=50%}
+
+
+```{r, echo=FALSE,message=FALSE}
+### TRAIN/TEST RUN
+train_index <- sample(1:1113,780)
+test_index <- setdiff(1:1113,train_index)
+
+
+forJags$getitrain.j <- train_index
+forJags$getitest.j <- test_index
+forJags$ntrain <- length(train_index)
+
+
+
+mod_test <- jags(data = forJags, 
+                    parameters.to.save=parnames, 
+                    n.chains = 4, n.burnin = 1500, n.iter =1500 + 1000, n.thin = 10, model.file = textConnection(model))
+
+mcmc.array_test <- mod_test$BUGSoutput$sims.array
+```
+
+
+```{r,echo=FALSE,out.width = "50%"}
+library(boot)
+
+### Data needs to be a dataframe with 
+### x2
+### x3
+### x4
+### age
+### race 
+
+
+
+generate_yrep_from_mcmc <- function(mod,nsamples,data){
+  ncols <- nsamples
+  beta_star_j <- mod$BUGSoutput$sims.list$beta.j[,,1]
+  
+  beta_star_0 <- beta_star_j[,1]
+  beta_star_1 <- beta_star_j[,2]
+  beta_star_2 <- beta_star_j[,3]
+  beta_star_3 <- beta_star_j[,4]
+  
+  beta_star_4 <- mod$BUGSoutput$sims.array[,,"beta4"]
+  beta_star_5 <- mod$BUGSoutput$sims.array[,,"beta5"]
+  
+  alpha_star_j <- mod$BUGSoutput$sims.list$beta.j[,,1]
+  
+  alpha_star_0 <- beta_star_j[,1]
+  alpha_star_1 <- beta_star_j[,2]
+  alpha_star_2 <- beta_star_j[,3]
+  alpha_star_3 <- beta_star_j[,4]
+  
+  alpha_star_4 <- mod$BUGSoutput$sims.array[,,"alpha4"]
+  alpha_star_5 <- mod$BUGSoutput$sims.array[,,"alpha5"]
+  
+  
+  log_lambda <- matrix(NA,nrow = nrow(data),ncol=ncols)
+  
+  
+  count <- 1
+  for (i in 1:nrow(data)){
+    tmp <- c()
+    for (mc_sample in 1:ncols){
+      tmp <- c(tmp,exp(beta_star_0[mc_sample] + beta_star_1[mc_sample]*data$x.2[i] + beta_star_2[mc_sample]*data$x.3[i] +beta_star_3[mc_sample]*data$x.4[i] + beta_star_4[mc_sample]*data$race[i] + beta_star_5[mc_sample]*data$age[i] ))
+    }
+    log_lambda[count,] <- tmp
+    count <- count +1
+  }
+  
+  
+  logit_pi <- matrix(NA,nrow = length(train_index),ncol=ncols)
+  
+  count <- 1
+  for (i in 1:nrow(data)){
+    tmp <- c()
+    for (mc_sample in 1:ncols){
+      tmp <- c(tmp,inv.logit(alpha_star_0[mc_sample] + alpha_star_1[mc_sample]*data$x.2[i] + alpha_star_2[mc_sample]*data$x.3[i] +alpha_star_3[mc_sample]*data$x.4[i] + alpha_star_4[mc_sample]*data$race[i] + alpha_star_5[mc_sample]*data$age[i] ))
+    }
+    logit_pi[count,] <- tmp
+    count <- count +1
+  }
+  
+  
+  yrep <- matrix(NA,nrow= nrow(data),ncol=ncols)
+  
+  for (i in 1:nrow(data)){
+    for (j in 1:ncols){
+      zero_part <- rbinom(1,1,logit_pi[i,j])
+      yrep[i,j] <- zero_part*rpois(1,log_lambda[i,j])
+    }
+  }
+  return (yrep)
+}
+
+
+#in sample
+yrep <- generate_yrep_from_mcmc(mod,400,dat[train_index,])
+yrep_mean <- rowMeans(yrep)
+plot(yrep_mean - dat$y[train_index])
+
+#out of  sample
+yrep_test <- generate_yrep_from_mcmc(mod,400,dat[test_index,])
+yrep_mean_test <- rowMeans(yrep_test)
+plot(yrep_mean_test[1:20],lty=1,type="l",col="blue",ylim=c(0,30),main="Out of sample predictions on the test set",ylab="yhat | y_train - y_true ")
+lines(dat$y[test_index][1:20])
+legend("topleft", legend=c("yhat", "ytrue"),
+       col=c("blue", "black"), lty=1:2, cex=0.8)
+
+```
+
+
+We can now examine the coverage probability. We do this by asking if the true observation falls within the 95% credible interval given by the monte carlo samples.
+
+
+### Coverage Probability
+
+```{r,echo=FALSE,out.width = "50%"}
+correct <- 0
+for (i in 1:nrow(yrep)){
+  true_y <- dat$y[train_index[i]]
+  if (true_y >= quantile(yrep[i,],.025) && true_y <= quantile(yrep[i,],.975)){
+    correct <- correct + 1
+  }
+  
+}
+
+print ("Empirical coverage probability")
+print (correct/nrow(yrep))
+```
+
+
+### ELPD AND PIT-LOO
+```{r,out.width = "50%"}
+library(loo)
+library(bayesplot)
+loglike1.model2<- mod$BUGSoutput$sims.list$L
+loo2 <- loo::loo(log(loglike1.model2))
+print (loo2$elpd_loo)
+plot(loo2$pointwise[, "elpd_loo"]  ~ dat$x.1[train_index], pch = 19,xlab="Rifle Indicator",      ylab = "ELPD model 1",ylim=c(-10,2))
+ abline(h=0)
+
+
+psis2 <- psislw(-log(loglike1.model2))
+lw2 <- psis2$lw_smooth
+ppc_loo_pit_overlay(
+  y = dat$y[train_index],
+  yrep = t(yrep),
+  lw = lw2
+)
+```
+
+
+
+
+
+```{r creating data sets, results = 'hide', echo=FALSE,message=FALSE}
+library(pander)
+totals <- read.csv("/Users/gcgibson/Downloads/gun_regulation_totals.csv")
+weapon <- as.vector(allshootings$Weapon.s..Categories)
+handgun<- as.data.frame(allshootings$State)
+r <- matrix(nrow=1113, ncol=2)
+state.j <- as.vector(allshootings$State)
+for (i in 1:length(state.j)){
+  r[i,1] <- state.j[i]
+  for (j in 1:length(totals$State)){
+    if (totals$State[j]==r[i]){
+        if (totals$State[j]==r[i])
+      r[i,2] <- totals$lawtotal[j]
+    }
+  }
+}
+gun_regualtions_vec <- as.numeric(r[,2])
+weapon_data1 <- matrix(NA, nrow=1113, ncol=3)
+weapon <- as.vector(allshootings$Weapon.s..Categories)
+for (i in 1:length(allshootings$Weapon.s..Categories)){
+  if (allshootings$Weapon.s..Categories[i]=="Handgun"){
+    weapon_data1[i,1] <- 1
+    weapon_data1[i,2] <- 0
+    weapon_data1[i,3] <- gun_regualtions_vec[i]
+  }
+  if (allshootings$Weapon.s..Categories[i]=="Rifle"){
+    weapon_data1[i,1] <- 0
+    weapon_data1[i,2] <- 1
+    weapon_data1[i,3] <- gun_regualtions_vec[i]
+  }
+}
+weapon_data1 <- weapon_data1[complete.cases(weapon_data1), ]
+weapon_data2 <- matrix(NA, nrow=1113, ncol=3)
+weapon <- as.vector(allshootings$Weapon.s..Categories)
+for (i in 1:length(allshootings$Weapon.s..Categories)){
+  if (allshootings$Weapon.s..Categories[i]=="Handgun"){
+    weapon_data2[i,1] <- 1
+    weapon_data2[i,2] <- 0
+    weapon_data2[i,3] <- gun_regualtions_vec[i]
+  }
+  if (allshootings$Weapon.s..Categories[i]=="Shotgun"){
+    weapon_data2[i,1] <- 0
+    weapon_data2[i,2] <- 1
+    weapon_data2[i,3] <- gun_regualtions_vec[i]
+  }
+}
+weapon_data2 <- weapon_data2[complete.cases(weapon_data2), ]
+```
+
+To specifically see if gun regulations impacts the weapon type used in a school shooting we will examine two logistic models. More specifically, we want to know gun regulations have an effect on a rifle or shotgun being used instead of a handgun in school shooting. Therefore, in both models the reference category is handgun. For the first model we have that ($y_i$) is rifle. 
+$$ y_i \sim Bern(p_i)$$
+$$logit(p_i) = \beta_0 + \beta_1 (g_i - \bar{g})$$
+where $\beta_0$ is the intercept and $\beta1$ is the change in log odds for a handgun being used to a rifle being used for each unit of increase in gun regulations. We set vague priors of $\beta_0 \sim N(0,10^2)$ and $\beta_1 \sim N(0,10^2).$
+
+
+```{r logistic model: handgun vs rifle, results='hide',  echo=FALSE,message=FALSE}
+model <- "
+model  {
+  for (i in 1:n){
+    shotgun[i] ~ dbern(p[i])
+    logit(p[i]) <- beta0 + beta1*(gun_regualtions_vec[i] - mean_gr1) 
+    loglike.i[i] <- logdensity.bern(shotgun[i], p[i])
+  }
+  beta0 ~ dnorm(0,0.001)
+  beta1 ~ dnorm(0,0.001)
+} # end model
+"
+jag.data <- list(shotgun = weapon_data1[,2], n=length(weapon_data1[,2]), gun_regualtions_vec=as.numeric(weapon_data1[,3]), mean_gr1 = mean(as.numeric(weapon_data1[,3])))
+parname <- c("beta0", "beta1", "loglike.i")
+mod_rifle1 <- jags(data = jag.data, parameters.to.save=parname, n.chains = 3, n.burnin = 1000, n.iter = 2500+1000, model.file = textConnection(model))
+```
+We also fit the same model with regional intercepts and slopes. 
+$$ y_i \sim Bern(p_i)$$
+$$logit(p_i) = \alpha_r + \beta_r (g_i - \bar{g})$$
+Where $r$ ie the region, $\alpha_r$ is the intercept for region $r$ and $\beta_r$ is the change in log odds for each unit of increase in gun regulations for region $r$. We set vague priors of $\alpha_r \sim N(0,10^2)$ and $\beta_r \sim N(0,10^2)$, with $r=1,...,8.$
+
+```{r logistic model: handgun vs rifle with region, , echo=FALSE,message=FALSE, results='hide'}
+model <- "
+model  {
+  for (i in 1:n){
+    rifle[i] ~ dbern(p[i])
+    logit(p[i]) <- alphabeta[region[i],1] + alphabeta[region[i],2]*(gun_regualtions_vec[i] - mean_gr1)
+    loglike.i[i] <- logdensity.bern(rifle[i], p[i])
+  }
+      
+  for (j in 1:J){
+     alphabeta[j,1:2] ~ dmnorm(mu_vec,InvSigma)
+  }
+   Sigma[1,1] <- pow(sigma.alpha,2)
+                    Sigma[2,2] <- pow(sigma.beta,2)
+      Sigma[1,2] <- rho.alphabeta*sigma.beta*sigma.alpha
+      Sigma[2,1] <- Sigma[1,2]
+      InvSigma[1:2, 1:2] <- inverse(Sigma[, ])
+      
+      # priors for cov matrix
+      rho.alphabeta ~ dunif(-1,1)
+      sigma.alpha ~ dunif(0,50)
+      sigma.beta ~ dunif(0,20)
+      
+      mu_vec[1] <- mu.alpha
+      mu_vec[2] <- mu.beta
+      mu.alpha ~ dnorm(0,mu.alpha.prec)
+      mu.beta ~dnorm(0,mu.beta.prec)
+      
+      mu.alpha.prec <- pow(mu.alpha.var,-2)
+      mu.alpha.var <- 100
+      
+      mu.beta.prec <- pow(mu.beta.var,-2)
+      mu.beta.var <- 100
+} # end model
+"
+jag.data <- list(rifle = weapon_data1[,2], n=length(weapon_data1[,2]), gun_regualtions_vec=as.numeric(weapon_data1[,3]), mean_gr1 = mean(as.numeric(weapon_data1[,3])),region=dat$region,J=J)
+parname <- c("alphabeta", "loglike.i")
+mod_rifle <- jags(data = jag.data, parameters.to.save=parname, n.chains = 3, n.burnin = 1000, n.iter = 4000+1000, model.file = textConnection(model))
+```
+ 
+```{r handgun/rifle model output multi,  echo=FALSE,message=FALSE}
+require(devtools)
+require(jagstools)
+jags.output <- jagsresults(x=mod_rifle1, params=c("beta1"))
+jags.rhat_ss <- jags.output[c("beta1"), c('mean', '2.5%', '97.5%', 'Rhat', 'n.eff')]
+pander(jags.rhat_ss, caption = "Beta for Rifle vs Handgun withour region")
+```
+
+```{r handgun/rifle model output 2, echo=FALSE,message=FALSE}
+require(devtools)
+require(jagstools)
+jags.output <- jagsresults(x=mod_rifle, params=c("alphabeta[1,2]","alphabeta[2,2]", "alphabeta[3,2]", "alphabeta[4,2]", "alphabeta[5,2]", "alphabeta[6,2]", "alphabeta[7,2]", "alphabeta[8,2]"))
+jags.rhat_ss <- jags.output[c("alphabeta[1,2]","alphabeta[2,2]", "alphabeta[3,2]", "alphabeta[4,2]", "alphabeta[5,2]", "alphabeta[6,2]", "alphabeta[7,2]", "alphabeta[8,2]"), c('mean', '2.5%', '97.5%', 'Rhat', 'n.eff')]
+pander(jags.rhat_ss, caption = "Beta for Rifle vs Handgun with region")
+```
+We can see that for both models, $\beta_1$ is not significant since the 95% credible interval contains zero.
+
+```{r, warning='hide', results='hide', echo=FALSE,message=FALSE}
+require(loo)
+loglike1 <- mod_rifle1$BUGSoutput$sims.list$loglike.i # samples x data points matrix with samples of logdensity from model with no gun regulations
+
+loo1 <- loo(loglike1)
+
+loglike2 <- mod_rifle$BUGSoutput$sims.list$loglike.i # samples x data points matrix with samples of logdensity from model with gun regulations
+
+loo2 <- loo(loglike2)
+
+compare(loo1, loo2) # compares the ELPDs for models with and without gun regulations 
+```
+In order to see which logistic model fit the best, we plotted the ELPDs against each other. The black diagonal line is where the models would have equal ELPD. Hence, when the points fall below this line, model 1 preforms better than model 2. However, when the points fall above this line, model 2 preforms better than model 1. We can see that more points fall below the line than above. This shows us that the model which does not include region preforms the best. 
+
+```{r, echo=FALSE,message=FALSE}
+plot(loo2$pointwise[, "elpd_loo"] ~ loo1$pointwise[, "elpd_loo"], pch = 19, col = 5,
+     ylab = "ELPD model with region", xlab = "ELPD model without region", main="Checking the pointwise differences in ELPDs for Rifle Model")
+abline(0,1)
+```
+
+For the other logistic model we have that ($y_i$) is shotgun. 
+$$ y_i \sim Bern(p_i)$$
+$$logit(p_i) = \beta_0 + \beta_1 (g_i - \bar{g})$$
+where $\beta_0$ is the intercept and $\beta1$ is the change in log odds for each unit of increase in gun regulations. We set vague priors of $\beta_0 \sim N(0,10^2)$ and $\beta_1 \sim N(0,10^2).$
+
+
+The model that includes region is given as follows. 
+$$ y_i \sim Bern(p_i)$$
+$$logit(p_i) = \alpha_r + \beta_r (g_i - \bar{g})$$
+Where $r$ is the region, $\alpha_r$ is the intercept for region $r$ and $\beta_r$ is the change in log odds for each unit of increase in gun regulations for region $r$. We set vague priors of $\alpha_r \sim N(0,10^2)$ and $\beta_r \sim N(0,10^2)$, with $r=1,...,8.$
+
+When comparing gunshot use to handgun use, the betas for each model are not significant. In the comparing the ELPDs among the model with region and without region, we also find that the model which does not include region preforms the best. 
+
+```{r logistic model: handgun vs shotgun, results='hide', echo=FALSE,message=FALSE}
+model <- "
+model  {
+  for (i in 1:n){
+    shotgun[i] ~ dbern(p[i])
+    logit(p[i]) <- beta0 + beta1*(gun_regualtions_vec[i] - mean_gr2) 
+    loglike.i[i] <- logdensity.bern(shotgun[i], p[i])
+  }
+  beta0 ~ dnorm(0,0.001)
+  beta1 ~ dnorm(0,0.001)
+} # end model
+"
+jag.data <- list(shotgun = weapon_data2[,2], n=length(weapon_data2[,2]), gun_regualtions_vec=as.numeric(weapon_data2[,3]), mean_gr2 = mean(as.numeric(weapon_data2[,3])))
+parname <- c("beta0", "beta1", "loglike.i")
+mod_shotgun1 <- jags(data = jag.data, parameters.to.save=parname, n.chains = 3, n.burnin = 1000, n.iter = 2500+1000, model.file = textConnection(model))
+```
+
+
+
+```{r handgun/shotgun model output, echo=FALSE,message=FALSE}
+require(devtools)
+require(jagstools)
+
+jags.output <- jagsresults(x=mod_shotgun1, params=c("beta1"))
+jags.rhat_ss <- jags.output[c("beta1"), c('mean', '2.5%', '97.5%', 'Rhat', 'n.eff')]
+pander(jags.rhat_ss, caption = "Beta for Shotgun vs Handgun")
+```
+
+
+```{r logistic model: handgun vs shotgun with region,, echo=FALSE,message=FALSE, results='hide'}
+model <- "
+model  {
+  for (i in 1:n){
+    shotgun[i] ~ dbern(p[i])
+    logit(p[i]) <- alphabeta[region[i],1] + alphabeta[region[i],2]*(gun_regualtions_vec[i] - mean_gr2)
+    loglike.i[i] <- logdensity.bern(shotgun[i], p[i])
+  }
+      
+  for (j in 1:J){
+     alphabeta[j,1:2] ~ dmnorm(mu_vec,InvSigma)
+  }
+   Sigma[1,1] <- pow(sigma.alpha,2)
+                    Sigma[2,2] <- pow(sigma.beta,2)
+      Sigma[1,2] <- rho.alphabeta*sigma.beta*sigma.alpha
+      Sigma[2,1] <- Sigma[1,2]
+      InvSigma[1:2, 1:2] <- inverse(Sigma[, ])
+      
+      # priors for cov matrix
+      rho.alphabeta ~ dunif(-1,1)
+      sigma.alpha ~ dunif(0,50)
+      sigma.beta ~ dunif(0,20)
+      
+      mu_vec[1] <- mu.alpha
+      mu_vec[2] <- mu.beta
+      mu.alpha ~ dnorm(0,mu.alpha.prec)
+      mu.beta ~dnorm(0,mu.beta.prec)
+      
+      mu.alpha.prec <- pow(mu.alpha.var,-2)
+      mu.alpha.var <- 100
+      
+      mu.beta.prec <- pow(mu.beta.var,-2)
+      mu.beta.var <- 100
+} # end model
+"
+jag.data <- list(shotgun = weapon_data2[,2], n=length(weapon_data2[,2]), gun_regualtions_vec=as.numeric(weapon_data2[,3]), mean_gr2 = mean(as.numeric(weapon_data2[,3])),region=dat$region,J=J)
+parname <- c("alphabeta", "loglike.i")
+mod_shotgun <- jags(data = jag.data, parameters.to.save=parname, n.chains = 3, n.burnin = 1000, n.iter = 4000+1000, model.file = textConnection(model))
+```
+
+```{r handgun/rifle model output, echo=FALSE,message=FALSE}
+jags.output <- jagsresults(x=mod_shotgun, params=c("alphabeta[1,2]","alphabeta[2,2]", "alphabeta[3,2]", "alphabeta[4,2]", "alphabeta[5,2]", "alphabeta[6,2]", "alphabeta[7,2]", "alphabeta[8,2]"))
+jags.rhat_ss <- jags.output[c("alphabeta[1,2]","alphabeta[2,2]", "alphabeta[3,2]", "alphabeta[4,2]", "alphabeta[5,2]", "alphabeta[6,2]", "alphabeta[7,2]", "alphabeta[8,2]"), c('mean', '2.5%', '97.5%', 'Rhat', 'n.eff')]
+pander(jags.rhat_ss, caption = "Beta for Shotgun vs Handgun with region")
+```
+
+```{r, warning='hide', results='hide', echo=FALSE,message=FALSE}
+require(loo)
+loglike1 <- mod_shotgun1$BUGSoutput$sims.list$loglike.i # samples x data points matrix with samples of logdensity from model with no gun regulations
+
+loo1 <- loo(loglike1)
+
+loglike2 <- mod_shotgun$BUGSoutput$sims.list$loglike.i # samples x data points matrix with samples of logdensity from model with gun regulations
+
+loo2 <- loo(loglike2)
+
+compare(loo1, loo2) # compares the ELPDs for models with and without gun regulations 
+```
+
+```{r, echo=FALSE,message=FALSE}
+plot(loo2$pointwise[, "elpd_loo"] ~ loo1$pointwise[, "elpd_loo"], pch = 19, col = 5,
+     ylab = "ELPD model with region", xlab = "ELPD model without region", main="Checking the pointwise differences in ELPDs for Shotgun Model")
+abline(0,1)
+```
+
