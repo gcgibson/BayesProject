@@ -267,7 +267,7 @@ region_2_gun_reg <- sum(gun_reg[gun_reg$State == "Minnesota",][1,3:ncol(gun_reg)
 
 
 
-region_3_gun_reg <- sum(gun_reg[gun_reg$State == "Alabama",][1,3:ncol(gun_reg)]) +sum(gun_reg[gun_reg$State == "Kentuky",][1,3:ncol(gun_reg)]) +sum(gun_reg[gun_reg$State == "Mississippi",][1,3:ncol(gun_reg)]) +sum(gun_reg[gun_reg$State == "Tennessee",][1,3:ncol(gun_reg)])+sum(gun_reg[gun_reg$State == "Arkansas",][1,3:ncol(gun_reg)])+sum(gun_reg[gun_reg$State == "Louisiana",][1,3:ncol(gun_reg)])+sum(gun_reg[gun_reg$State == "Oklahoma",][1,3:ncol(gun_reg)])+sum(gun_reg[gun_reg$State == "Texas",][1,3:ncol(gun_reg)])
+region_3_gun_reg <- sum(gun_reg[gun_reg$State == "Alabama",][1,3:ncol(gun_reg)]) +sum(gun_reg[gun_reg$State == "Kentucky",][1,3:ncol(gun_reg)]) +sum(gun_reg[gun_reg$State == "Mississippi",][1,3:ncol(gun_reg)]) +sum(gun_reg[gun_reg$State == "Tennessee",][1,3:ncol(gun_reg)])+sum(gun_reg[gun_reg$State == "Arkansas",][1,3:ncol(gun_reg)])+sum(gun_reg[gun_reg$State == "Louisiana",][1,3:ncol(gun_reg)])+sum(gun_reg[gun_reg$State == "Oklahoma",][1,3:ncol(gun_reg)])+sum(gun_reg[gun_reg$State == "Texas",][1,3:ncol(gun_reg)])
 
 
 
@@ -449,15 +449,6 @@ mcmc.array <- mod$BUGSoutput$sims.array
 ```{r,echo=FALSE,out.width = "50%"}
 library(boot)
 
-### Data needs to be a dataframe with 
-### x2
-### x3
-### x4
-### age
-### race 
-
-
-
 generate_yrep_from_mcmc <- function(mod,nsamples,data){
   ncols <- nsamples
   beta_star_j <- mod$BUGSoutput$sims.list$beta.j[,,1]
@@ -536,7 +527,7 @@ legend("topleft", legend=c("yhat", "ytrue"),
 ```
 
 
-We can now examine the coverage probability. We do this by asking if the true observation falls within the 95% credible interval given by the monte carlo samples.
+We can now examine the coverage probability. We do this by asking if the true observation falls within the 95% credible interval given by the Monte Carlo samples.
 
 
 ### Coverage Probability
@@ -554,7 +545,7 @@ for (i in 1:nrow(yrep)){
 print ("Empirical coverage probability")
 print (correct/nrow(yrep))
 ```
-
+The empirical coverage probability is 'r correct/nrow(yrep)', which tells us that our covergae interval is too narrow since less than 95% of the true values fall within the coverage interval. We can also see this in the PIT plot below. The PIT forms a smiley face as compared to a uniform distribution, which indicates that the predictive distributions are too narrow as compared to what they should be. 
 
 ### ELPD AND PIT-LOO
 ```{r,out.width = "50%"}
@@ -629,8 +620,34 @@ for (i in 1:length(allshootings$Weapon.s..Categories)){
 weapon_data2 <- weapon_data2[complete.cases(weapon_data2), ]
 ```
 
+To specifically see if gun regulations impacts the weapon type used in a school shooting we will examine two logistic models. More specifically, we want to know gun regulations have an effect on a rifle or shotgun being used instead of a handgun in school shooting. Therefore, in both models the reference category is handgun. For the first model we have that ($y_i$) is rifle. 
+$$ y_i \sim Bern(p_i)$$
+$$logit(p_i) = \beta_0 + \beta_1 (g_i - \bar{g})$$
+where $\beta_0$ is the intercept and $\beta1$ is the change in log odds for a handgun being used to a rifle being used for each unit of increase in gun regulations. We set vague priors of $\beta_0 \sim N(0,10^2)$ and $\beta_1 \sim N(0,10^2).$
 
-```{r logistic model: handgun vs rifle}
+
+```{r logistic model: handgun vs rifle, results='hide'}
+model <- "
+model  {
+  for (i in 1:n){
+    shotgun[i] ~ dbern(p[i])
+    logit(p[i]) <- beta0 + beta1*(gun_regualtions_vec[i] - mean_gr1) 
+    loglike.i[i] <- logdensity.bern(shotgun[i], p[i])
+  }
+  beta0 ~ dnorm(0,0.001)
+  beta1 ~ dnorm(0,0.001)
+} # end model
+"
+jag.data <- list(shotgun = weapon_data1[,2], n=length(weapon_data1[,2]), gun_regualtions_vec=as.numeric(weapon_data1[,3]), mean_gr1 = mean(as.numeric(weapon_data1[,3])))
+parname <- c("beta0", "beta1", "loglike.i")
+mod_rifle1 <- jags(data = jag.data, parameters.to.save=parname, n.chains = 3, n.burnin = 1000, n.iter = 2500+1000, model.file = textConnection(model))
+```
+We also fit the same model with regional intercepts and slopes. 
+$$ y_i \sim Bern(p_i)$$
+$$logit(p_i) = \alpha_r + \beta_r (g_i - \bar{g})$$
+Where $r$ ie the region, $\alpha_r$ is the intercept for region $r$ and $\beta_r$ is the change in log odds for each unit of increase in gun regulations for region $r$. We set vague priors of $\alpha_r \sim N(0,10^2)$ and $\beta_r \sim N(0,10^2)$, with $r=1,...,8.$
+
+```{r logistic model: handgun vs rifle with region, results='hide'}
 model <- "
 model  {
   for (i in 1:n){
@@ -669,19 +686,58 @@ jag.data <- list(rifle = weapon_data1[,2], n=length(weapon_data1[,2]), gun_regua
 parname <- c("alphabeta", "loglike.i")
 mod_rifle <- jags(data = jag.data, parameters.to.save=parname, n.chains = 3, n.burnin = 1000, n.iter = 4000+1000, model.file = textConnection(model))
 ```
-
-
+ 
+```{r handgun/rifle model output}
+require(devtools)
+require(jagstools)
+jags.output <- jagsresults(x=mod_rifle1, params=c("beta1"))
+jags.rhat_ss <- jags.output[c("beta1"), c('mean', '2.5%', '97.5%', 'Rhat', 'n.eff')]
+pander(jags.rhat_ss, caption = "Beta for Rifle vs Handgun withour region")
+```
 
 ```{r handgun/rifle model output}
 require(devtools)
 require(jagstools)
-jags.output <- jagsresults(x=mod_rifle, params=c("alphabeta"))
-jags.rhat_ss <- jags.output[c("beta1"), c('mean', '2.5%', '97.5%', 'Rhat', 'n.eff')]
-pander(jags.rhat_ss, caption = "Beta for Rifle vs Handgun")
+jags.output <- jagsresults(x=mod_rifle, params=c("alphabeta[1,2]","alphabeta[2,2]", "alphabeta[3,2]", "alphabeta[4,2]", "alphabeta[5,2]", "alphabeta[6,2]", "alphabeta[7,2]", "alphabeta[8,2]"))
+jags.rhat_ss <- jags.output[c("alphabeta[1,2]","alphabeta[2,2]", "alphabeta[3,2]", "alphabeta[4,2]", "alphabeta[5,2]", "alphabeta[6,2]", "alphabeta[7,2]", "alphabeta[8,2]"), c('mean', '2.5%', '97.5%', 'Rhat', 'n.eff')]
+pander(jags.rhat_ss, caption = "Beta for Rifle vs Handgun with region")
+```
+We can see that for both models, $\beta_1$ is not significant since the 95% credible interval contains zero.
+
+```{r, warning='hide', results='hide'}
+require(loo)
+loglike1 <- mod_rifle1$BUGSoutput$sims.list$loglike.i # samples x data points matrix with samples of logdensity from model with no gun regulations
+
+loo1 <- loo(loglike1)
+
+loglike2 <- mod_rifle$BUGSoutput$sims.list$loglike.i # samples x data points matrix with samples of logdensity from model with gun regulations
+
+loo2 <- loo(loglike2)
+
+compare(loo1, loo2) # compares the ELPDs for models with and without gun regulations 
+```
+In order to see which logistic model fit the best, we plotted the ELPDs against each other. The black diagonal line is where the models would have equal ELPD. Hence, when the points fall below this line, model 1 preforms better than model 2. However, when the points fall above this line, model 2 preforms better than model 1. We can see that more points fall below the line than above. This shows us that the model which does not include region preforms the best. 
+
+```{r}
+plot(loo2$pointwise[, "elpd_loo"] ~ loo1$pointwise[, "elpd_loo"], pch = 19, col = 5,
+     ylab = "ELPD model with region", xlab = "ELPD model without region", main="Checking the pointwise differences in ELPDs for Rifle Model")
+abline(0,1)
 ```
 
+For the other logistic model we have that ($y_i$) is shotgun. 
+$$ y_i \sim Bern(p_i)$$
+$$logit(p_i) = \beta_0 + \beta_1 (g_i - \bar{g})$$
+where $\beta_0$ is the intercept and $\beta1$ is the change in log odds for each unit of increase in gun regulations. We set vague priors of $\beta_0 \sim N(0,10^2)$ and $\beta_1 \sim N(0,10^2).$
 
-```{r logistic model: handgun vs shotgun}
+
+The model that includes region is given as follows. 
+$$ y_i \sim Bern(p_i)$$
+$$logit(p_i) = \alpha_r + \beta_r (g_i - \bar{g})$$
+Where $r$ is the region, $\alpha_r$ is the intercept for region $r$ and $\beta_r$ is the change in log odds for each unit of increase in gun regulations for region $r$. We set vague priors of $\alpha_r \sim N(0,10^2)$ and $\beta_r \sim N(0,10^2)$, with $r=1,...,8.$
+
+When comparing gunshot use to handgun use, the betas for each model are not significant. In the comparing the ELPDs among the model with region and without region, we also find that the model which does not include region preforms the best. 
+
+```{r logistic model: handgun vs shotgun, results='hide'}
 model <- "
 model  {
   for (i in 1:n){
@@ -695,7 +751,7 @@ model  {
 "
 jag.data <- list(shotgun = weapon_data2[,2], n=length(weapon_data2[,2]), gun_regualtions_vec=as.numeric(weapon_data2[,3]), mean_gr2 = mean(as.numeric(weapon_data2[,3])))
 parname <- c("beta0", "beta1", "loglike.i")
-mod_shotgun <- jags(data = jag.data, parameters.to.save=parname, n.chains = 3, n.burnin = 1000, n.iter = 2500+1000, model.file = textConnection(model))
+mod_shotgun1 <- jags(data = jag.data, parameters.to.save=parname, n.chains = 3, n.burnin = 1000, n.iter = 2500+1000, model.file = textConnection(model))
 ```
 
 
@@ -704,16 +760,74 @@ mod_shotgun <- jags(data = jag.data, parameters.to.save=parname, n.chains = 3, n
 require(devtools)
 require(jagstools)
 
-jags.output <- jagsresults(x=mod_shotgun, params=c("beta1"))
+jags.output <- jagsresults(x=mod_shotgun1, params=c("beta1"))
 jags.rhat_ss <- jags.output[c("beta1"), c('mean', '2.5%', '97.5%', 'Rhat', 'n.eff')]
 pander(jags.rhat_ss, caption = "Beta for Shotgun vs Handgun")
 ```
 
 
+```{r logistic model: handgun vs shotgun with region, results='hide'}
+model <- "
+model  {
+  for (i in 1:n){
+    shotgun[i] ~ dbern(p[i])
+    logit(p[i]) <- alphabeta[region[i],1] + alphabeta[region[i],2]*(gun_regualtions_vec[i] - mean_gr2)
+    loglike.i[i] <- logdensity.bern(shotgun[i], p[i])
+  }
+      
+  for (j in 1:J){
+     alphabeta[j,1:2] ~ dmnorm(mu_vec,InvSigma)
+  }
+   Sigma[1,1] <- pow(sigma.alpha,2)
+                    Sigma[2,2] <- pow(sigma.beta,2)
+      Sigma[1,2] <- rho.alphabeta*sigma.beta*sigma.alpha
+      Sigma[2,1] <- Sigma[1,2]
+      InvSigma[1:2, 1:2] <- inverse(Sigma[, ])
+      
+      # priors for cov matrix
+      rho.alphabeta ~ dunif(-1,1)
+      sigma.alpha ~ dunif(0,50)
+      sigma.beta ~ dunif(0,20)
+      
+      mu_vec[1] <- mu.alpha
+      mu_vec[2] <- mu.beta
+      mu.alpha ~ dnorm(0,mu.alpha.prec)
+      mu.beta ~dnorm(0,mu.beta.prec)
+      
+      mu.alpha.prec <- pow(mu.alpha.var,-2)
+      mu.alpha.var <- 100
+      
+      mu.beta.prec <- pow(mu.beta.var,-2)
+      mu.beta.var <- 100
+} # end model
+"
+jag.data <- list(shotgun = weapon_data2[,2], n=length(weapon_data2[,2]), gun_regualtions_vec=as.numeric(weapon_data2[,3]), mean_gr2 = mean(as.numeric(weapon_data2[,3])),region=dat$region,J=J)
+parname <- c("alphabeta", "loglike.i")
+mod_shotgun <- jags(data = jag.data, parameters.to.save=parname, n.chains = 3, n.burnin = 1000, n.iter = 4000+1000, model.file = textConnection(model))
+```
 
+```{r handgun/rifle model output}
+jags.output <- jagsresults(x=mod_shotgun, params=c("alphabeta[1,2]","alphabeta[2,2]", "alphabeta[3,2]", "alphabeta[4,2]", "alphabeta[5,2]", "alphabeta[6,2]", "alphabeta[7,2]", "alphabeta[8,2]"))
+jags.rhat_ss <- jags.output[c("alphabeta[1,2]","alphabeta[2,2]", "alphabeta[3,2]", "alphabeta[4,2]", "alphabeta[5,2]", "alphabeta[6,2]", "alphabeta[7,2]", "alphabeta[8,2]"), c('mean', '2.5%', '97.5%', 'Rhat', 'n.eff')]
+pander(jags.rhat_ss, caption = "Beta for Shotgun vs Handgun with region")
+```
 
+```{r, warning='hide', results='hide'}
+require(loo)
+loglike1 <- mod_shotgun1$BUGSoutput$sims.list$loglike.i # samples x data points matrix with samples of logdensity from model with no gun regulations
 
+loo1 <- loo(loglike1)
 
+loglike2 <- mod_shotgun$BUGSoutput$sims.list$loglike.i # samples x data points matrix with samples of logdensity from model with gun regulations
 
+loo2 <- loo(loglike2)
 
+compare(loo1, loo2) # compares the ELPDs for models with and without gun regulations 
+```
+
+```{r}
+plot(loo2$pointwise[, "elpd_loo"] ~ loo1$pointwise[, "elpd_loo"], pch = 19, col = 5,
+     ylab = "ELPD model with region", xlab = "ELPD model without region", main="Checking the pointwise differences in ELPDs for Shotgun Model")
+abline(0,1)
+```
 
