@@ -556,7 +556,7 @@ for (i in 1:nrow(yrep)){
 print ("Empirical coverage probability")
 print (correct/nrow(yrep))
 ```
-
+The empirical coverage probability is 'r correct/nrow(yrep)', which tells us that our covergae interval is too narrow since less than 95% of the true values fall within the coverage interval. We can also see this in the PIT plot below. The PIT forms a smiley face as compared to a uniform distribution, which indicates that the predictive distributions are too narrow as compared to what they should be. 
 
 ### ELPD AND PIT-LOO
 ```{r,out.width = "50%"}
