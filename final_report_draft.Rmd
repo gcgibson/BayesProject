@@ -598,7 +598,7 @@ This tells us that our prediction intervals are too wide.
 
 
 ### ELPD AND PIT-LOO
-```{r,out.width = "50%",echo=FALSE,message=FALSE, warning=FALSE}
+```{r,out.width = "40%",echo=FALSE,message=FALSE, warning=FALSE}
 library(loo)
 library(bayesplot)
 par(oma=c(0,0,2,0))
@@ -611,11 +611,17 @@ plot(loo2,main="Hello")
 
 psis2 <- psislw(-log(loglike1.model2))
 lw2 <- psis2$lw_smooth
+
+```
+
+```{r,out.width = "30%",echo=FALSE,message=FALSE, warning=FALSE}
 ppc_loo_pit_overlay(
   y = dat$y[train_index],
   yrep = t(yrep),
-  lw = lw2
+  lw = lw2,
+  size=.1
 )
+
 ```
 
 
@@ -749,7 +755,7 @@ jags.rhat_ss <- jags.output[c("beta1"), c('mean', '2.5%', '97.5%', 'Rhat', 'n.ef
 pander(jags.rhat_ss, caption = "Beta for Rifle vs Handgun withour region")
 ```
 
-```{r handgun/rifle model output 2, warning=FALSE, echo=FALSE,message=FALSE, out.width = "50%"}
+```{r handgun/rifle model output 2, warning=FALSE, echo=FALSE,message=FALSE}
 require(devtools)
 require(jagstools)
 jags.output <- jagsresults(x=mod_rifle, params=c("alphabeta[1,2]","alphabeta[2,2]", "alphabeta[3,2]", "alphabeta[4,2]", "alphabeta[5,2]", "alphabeta[6,2]", "alphabeta[7,2]", "alphabeta[8,2]"))
@@ -758,7 +764,7 @@ pander(jags.rhat_ss, caption = "Beta for Rifle vs Handgun with region")
 ```
 We can see that for both models, $\beta_1$ is not significant since the 95% credible interval contains zero.
 
-```{r, warning='hide', results='hide', warning=FALSE, echo=FALSE,message=FALSE,out.width = "50%"}
+```{r, warning='hide', results='hide', warning=FALSE, echo=FALSE,message=FALSE}
 require(loo)
 loglike1 <- mod_rifle1$BUGSoutput$sims.list$loglike.i # samples x data points matrix with samples of logdensity from model with no gun regulations
 
@@ -772,7 +778,7 @@ compare(loo1, loo2) # compares the ELPDs for models with and without gun regulat
 ```
 In order to see which logistic model fit the best, we plotted the ELPDs against each other. The black diagonal line is where the models would have equal ELPD. Hence, when the points fall below this line, model 1 preforms better than model 2. However, when the points fall above this line, model 2 preforms better than model 1. We can see that more points fall below the line than above. This shows us that the model which does not include region preforms the best. 
 
-```{r, echo=FALSE,message=FALSE, warning=FALSE,out.width = "50%"}
+```{r, echo=FALSE,message=FALSE, warning=FALSE}
 plot(loo2$pointwise[, "elpd_loo"] ~ loo1$pointwise[, "elpd_loo"], pch = 19, col = 5,
      ylab = "ELPD model with region", xlab = "ELPD model without region", main="Checking the pointwise differences in ELPDs for Rifle Model")
 abline(0,1)
