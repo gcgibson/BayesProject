@@ -894,3 +894,12 @@ abline(0,1)
 ## Discussion
 
 ## References
+Laurine, E. (2018). _Database of All Types of On-Campus Shootings at U.S. Schools._ Retrieved from http://www.schoolshootingsdatabase.com
+Gelman, Carlin, Stern, Dunson, Ventari and Rubin (2013). _Bayesian Data Analysis (Third
+Edition)._ Chapman and Hall. 
+Gelman and Hill (2006). _Data Analysis Using Regression and Multilevel/Hierarchical Models._
+Cambridge University Press.
+Hoff (2010). _A first course in Bayesian statistical methods._ Springer.
+Kruschke (2014). _Doing Bayesian Data Analysis, Second Edition: A Tutorial with R, JAGS
+and STAN._ Academic Press
+Lesaffre and A.B. Lawson (2012). _Statistics in Practice: Bayesian Biostatistics._ John Wiley & Sons.
