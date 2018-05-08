@@ -21,7 +21,7 @@ knitr::opts_chunk$set(cache=TRUE)
 School shootings have become much more prominent in the media in recent years, which has encouraged a push for more gun regulation and gun control. We have heard arguments on both sides of the assault rifle legislation issue. Our plan for this project is to take a statistical approach the question: Are assault rifles associated with a higher number of victims in a school shooting?
 
 ## Data
-Our data was obtained through an independent source, Eric Laurine. This data set contains detailed information about shootings dating back to 1840. For our analysis, we chose to focus on data beginning in 1991, since we could potentially also take into account gun regulation data. Our final data set had 1113 observations and 8 clusters.
+Our data was obtained through an independent source, Eric Laurine. For more information on what Laurine constitutes as a school shooting adn the sources that were used to compile the data set, see Appendix A. This data set contains detailed information about shootings dating back to 1840. For our analysis, we chose to focus on data beginning in 1991, since we could potentially also take into account gun regulation data. Our final data set had 1113 observations and 8 clusters.
 
 ![School Shootings](/Users/gcgibson/BayesProject/shootingcountperyear.png){width=50%}
 ![School Shootings](/Users/gcgibson/BayesProject/Region_ID.png){width=50%}
@@ -124,7 +124,7 @@ $$\Gamma \sim \mbox{invWishart}(R, 100)$$
 $$\mu_{\beta} \sim N(0,100)$$
 $$\mu_{\alpha} \sim N(0,100)$$
 
-We use a hurdle hierarchical model, where $y_i$ is the number of victims in a shooting $i$. $\pi_i$ is the probability of no victims in a shooting $i$. $g$ is the Poisson density that is factored into this probability if there are victims. $\mbox{logit}(\pi_i)$ is the log odds that a shooting had at least one victim, and is modeled using a logistic regression with gun type, $x_i$, centered race, $r_i$, and centered age, $a_i$. $\log (\lambda_i)$ is the log-expected number of victims given that there was at least one victim, and is model using a poisson regression with the same variables mentioned previously. The $\alpha$'s and $\beta$'s are given a multivariate normal distribution. $\mu_{\alpha}$ and $\mu_{\beta}$ are given vague normal priors, and the variance-covariance matricies, $\Gamma$ and $\Sigma$, are given a vague inverse Wishart prior distribution. 
+We use a hurdle hierarchical model, where $y_i$ is the number of victims in a shooting $i$. $\pi_i$ is the probability of no victims in a shooting $i$. $g$ is the Poisson density that is factored into this probability if there are victims. $\mbox{logit}(\pi_i)$ is the log odds that a shooting had at least one victim, and is modeled using a logistic regression with gun type, $x_i$, centered race, $r_i$, and centered age, $a_i$. $\log (\lambda_i)$ is the log-expected number of victims given that there was at least one victim, and is model using a poisson regression with the same variables mentioned previously. The $\alpha$'s and $\beta$'s are given a multivariate normal distribution. $\mu_{\alpha}$ and $\mu_{\beta}$ are given vague normal priors, and the variance-covariance matricies, $\Gamma$ and $\Sigma$, are given a vague inverse Wishart prior distribution. For JAGS model code see Appendix B. 
 
 We chose to use a hurdle model because in order to see if weapon type has an effect on the number of casualties, we need to have at least one casualty at each incidence of shooting. The hurdle model allows us to account for the incidences when there were no casualties. We also centered the race and age variables to reduce correlation. We created $j=9$ regions (clusters) using the state information (including 1 for NA). We make the assumption that given gun type, race, and age that the number of victims in shooting $i$ is conditionally independent of the number of victims in shooting $j$ and we do not address the time ordered nature of the data. We leave this for further work. 
 
@@ -679,7 +679,7 @@ We can see from the traceplot and kernel density estimate of $\beta_{1,1}$ that 
 To specifically see if gun regulations impacts the weapon type used in a school shooting we will examine a logistic model. More specifically, we want to know if gun regulations have an effect on a rifle being used instead of a handgun in school shooting. Therefore, the reference category is handgun. $y_i=1$ when a rifle is used and $y_i=0$ when a handgun is used.
 $$ y_i \sim Bern(p_i)$$ 
 $$logit(p_i) = \beta_0 + \beta_1 (g_i - \bar{g})$$
-Where $\beta_0$ is the intercept and $\beta1$ is the change in log odds for a handgun being used to a rifle being used for each unit of increase in gun regulations. We set vague priors of $\beta_0 \sim N(0,10^2)$ and $\beta_1 \sim N(0,10^2).$
+Where $\beta_0$ is the intercept and $\beta1$ is the change in log odds for a handgun being used to a rifle being used for each unit of increase in gun regulations. We set vague priors of $\beta_0 \sim N(0,10^2)$ and $\beta_1 \sim N(0,10^2).$ For JAGS model code see Appendix C.
 
 
 ```{r logistic model: handgun vs rifle,warning=FALSE,  results='hide',  echo=FALSE,message=FALSE}
@@ -787,6 +787,8 @@ The data set is constantly being updated, with the last update being on May 2, 2
 As for the results from this analysis, the effect of assault rifles on the number of victims varies by region. Therefore, gun-regulation policy might not be as easy banning assault rifles. However, further research into the effect of gun regulations on weapon type used could provide better insight into answering the question: Are assault rifles associated with a higher number of victims in a school shooting? 
 The lack of research on school shooting in the United States is concerning. We are hopeful that the results from this study and further analysis to come can help to guide policies related to run regulations.  
 
+\newpage 
+
 ## References
 
 Angelo Canty and Brian Ripley (2017). boot: Bootstrap R (S-Plus) Functions. R package version 1.3-20.
@@ -809,3 +811,137 @@ Lesaffre and A.B. Lawson (2012). _Statistics in Practice: Bayesian Biostatistics
 Malick, Machael. (2017) jagstools: An R package to conveniently run JAGS in parallel from R. https://github.com/michaelmalick/r-jagstools
 Plummer, Martyn. (2016) rjags: Bayesian Graphical Models using MCMC. R package version 4.6. http://mcmc-jags.sourceforge.net/
 Su, Yu-Sung & Yajima, Masanao. (2015). r2jags: Using R to Run 'JAGS'. R package version 0.5.7. https://CRAN.R-project.org/package=R2jags
+
+
+#Appendix
+
+##A
+
+What is included in the data set: 
+begin{itemize}
+\item a shooting must occur on-campus or at a school sponsored event (like the prom)
+\item shootings NEAR schools are not included. I also have constructed additional spreadsheets for off-campus (or near) school shootings, no shots fired incidents that occur on school grounds, and bb gun school shootings that too often get mixed in with on-campus shootings in other school violence research projects 
+\item includes shootings on school buses but NOT at bus stops
+\item mass shooting (or attempted mass) attacks are defined as 3 or more victims injured and or killed
+\item includes all levels of education 
+\item includes shootings inside & outside of the school
+\item shootings where the shooter is off campus shooting at the school (are included (ex. Brenda Spencer-1979 shooting at Grover Cleveland Elementary School in San Diego, Ca that killed two and wounded 9)
+\item includes shootings that happen after school hours 
+\item includes suicides & accidental shootings
+end{itemize}
+
+Sources used to obtain data: 
+begin{itemize}
+\item newspapers.com
+\item newspaperarchive.com 
+\item High Beam Research highbeam.com
+\item  justia.com
+\item  courtlistener.com
+\item  casetext.com-
+\item NY Times archive 
+\item Police reports
+\item www.elephind.com 
+end{itmeize}
+
+\newpage
+
+##B 
+
+```{r, echo=TRUE, eval=FALSE}
+model <- "model{
+
+    # reference for C and zero trick http://www.medicine.mcgill.ca/epidemiology/Joseph/courses/common/Tricks.html
+    C <- 10000 
+
+    for(j in 1:ntrain){
+      LikCountModel[j] <- pow(mu[j],y[getitrain.j[j]])/y_fact[getitrain.j[j]]*exp(-mu[j])
+      
+    # beta part
+      eta[j] <- beta.j[1,region[j]] + beta.j[2,region[j]]*x2[getitrain.j[j]] + beta.j[3,region[j]]*x3[getitrain.j[j]]   +   beta.j[4,region[j]]*x4[getitrain.j[j]] + beta4*race[getitrain.j[j]] + beta5*age[getitrain.j[j]]
+      
+      mu[j] <- exp(eta[j])
+      #alpha part
+     zeta[j] <- alpha.j[1,region[j]] + alpha.j[2,region[j]]*x2[getitrain.j[j]] + alpha.j[3,region[j]]*x3[getitrain.j[j]]   +   alpha.j[4,region[j]]*x4[getitrain.j[j]] + alpha4*race[getitrain.j[j]] + alpha5*age[getitrain.j[j]]
+      w[j] <- exp(zeta[j])/(1+exp(zeta[j]))
+      
+      #1/0 Tricks: ones is a column containing only ones, with the same size of y
+      p[j] <- L[j] / C
+      ones[j] ~ dbern(p[j])
+
+
+      indicator[j] <- ifelse(y[j] > 0, 1, 0)
+
+      #Full likelihood expression
+      L[j] <- indicator[j]*LikCountModel[j] * (1-w[j]) + equals(y[j],0)*w[j]
+      
+    } 
+  
+    for (j in 1:4){
+      mu_beta_vec[j] <- mu_beta 
+    }
+
+    for (j in 1:4){
+      mu_alpha_vec[j] <- mu_alpha 
+    }
+    
+    for (j in 1:J){
+       beta.j[1:4,j] ~ dmnorm( mu_beta_vec, V)
+     
+    }
+  
+     for (j in 1:J){
+       alpha.j[1:4,j] ~ dmnorm( mu_alpha_vec, W)
+     }
+  
+    V ~ dwish(R, 4)
+    W ~ dwish(R, 4)
+    sigma ~ dunif(0,20)
+    alpha4 ~ dnorm(mu.alpha,tau.alpha)
+    alpha5 ~ dnorm(mu.alpha,tau.alpha)
+    beta4 ~ dnorm(mu.beta,tau.beta) 
+    beta5 ~ dnorm(mu.beta,tau.beta) 
+    mu_beta ~ dnorm(0,.01)
+    mu_alpha ~ dnorm(0,.01)
+    
+    r ~ dunif(0,50)
+}"
+
+forJags <- list(
+                x2=dat$x.2,
+                x3=dat$x.3,
+                x4 = dat$x.4,
+                race = dat$race ,
+                age = dat$age,
+                y=dat$y,
+                ones = ones_,# DV
+                y_fact = y_fact,
+                R = diag(c(1,1,1,1)),
+                gun_reg_vec = gun_reg_vec,
+                prec_vec = solve(diag(4)),
+                region = dat$region,
+                J = 9,
+                mu.beta=0,  # priors centered on 0
+                tau.beta=.1,
+                mu.alpha=0,  # priors centered on 0
+                tau.alpha=.1
+                )  # diffuse priors
+```
+
+\newpage 
+
+##C
+
+```{r, echo=TRUE, eval=FALSE}
+model <- "
+model  {
+  for (i in 1:n){
+    shotgun[i] ~ dbern(p[i])
+    logit(p[i]) <- beta0 + beta1*(gun_regualtions_vec[i] - mean_gr1) 
+    loglike.i[i] <- logdensity.bern(shotgun[i], p[i])
+  }
+  beta0 ~ dnorm(0,0.001)
+  beta1 ~ dnorm(0,0.001)
+} # end model
+"
+jag.data <- list(shotgun = weapon_data1[,2], n=length(weapon_data1[,2]), gun_regualtions_vec=as.numeric(weapon_data1[,3]), mean_gr1 = mean(as.numeric(weapon_data1[,3])))
+```
