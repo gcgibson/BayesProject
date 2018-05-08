@@ -5,6 +5,10 @@ date: "4/21/2018"
 output:
   pdf_document: default
   html_document: default
+  header-includes:
+   - \usepackage{bm}
+   - \usepackage{amsmath}
+   - \usepackage{booktabs}
 ---
 
 ```{r setup, include=FALSE}
@@ -777,6 +781,11 @@ abline(0,1)
 ```
 
 ## Discussion
+
+The data set is constantly being updated, with the last update being on May 2, 2018. Future work should include running the updated data set. In the current data set, there are 468 missing observations out of 1,113 observations for weapons category. 
+
+As for the results from this analysis, the effect of assault rifles on the number of victims varies by region. Therefore, gun-regulation policy might not be as easy banning assault rifles. However, further research into the effect of gun regulations on weapon type used could provide better insight into answering the question: Are assault rifles associated with a higher number of victims in a school shooting? 
+The lack of research on school shooting in the United States is concerning. We are hopeful that the results from this study and further analysis to come can help to guide policies related to run regulations.  
 
 ## References
 
